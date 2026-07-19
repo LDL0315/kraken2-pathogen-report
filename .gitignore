@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# WorkBuddy IDE workspace data (private)
+.workbuddy/
+
+# SSH keys / credentials
+ls
+ls.pub
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+*.pem
+*.key
+
+# Environment / secrets
+.env
+.env.*
+
+# Logs & temp
+*.log
+*.tmp
+*.swp
+
+# Node (if added later)
+node_modules/
+
+# Excel source files (generated JS is tracked instead)
+*.xlsx

@@ -3,66 +3,69 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Kraken2 病原体检测报告</title>
+    <title>kraken2-pathogen-report</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header class="topbar">
       <div>
-        <p class="eyebrow">Kraken2 / nt report viewer</p>
-        <h1>病原体检测报告</h1>
+        <p class="eyebrow" data-i18n="app.eyebrow">Kraken2 / nt report viewer</p>
+        <h1 data-i18n="app.title">病原体检测报告</h1>
       </div>
-      <div class="mode-switch" role="tablist" aria-label="展示模式">
-        <button class="mode-btn active" data-mode="single" role="tab" aria-selected="true">单样本报告</button>
-        <button class="mode-btn" data-mode="multi" role="tab" aria-selected="false">多样本比较</button>
+      <div class="topbar-right">
+        <button id="langToggle" class="lang-btn" type="button">EN</button>
+        <div class="mode-switch" role="tablist" aria-label="Display mode">
+          <button class="mode-btn active" data-mode="single" role="tab" aria-selected="true" data-i18n="mode.single">单样本报告</button>
+          <button class="mode-btn" data-mode="multi" role="tab" aria-selected="false" data-i18n="mode.multi">多样本比较</button>
+        </div>
       </div>
     </header>
 
     <main class="shell">
-      <section class="upload-panel" aria-label="文件上传">
+      <section class="upload-panel" aria-label="File upload">
         <div class="upload-copy">
-          <h2>上传 .k2report 文件</h2>
-          <p>支持 Kraken2 标准 6 列 report，也支持带 minimizer 数据的 8 列 report。所有解析和判读都在本地浏览器完成。</p>
+          <h2 data-i18n="upload.title">上传 .k2report 文件</h2>
+          <p data-i18n="upload.desc">支持 Kraken2 标准 6 列 report，也支持带 minimizer 数据的 8 列 report。所有解析和判读都在本地浏览器完成。</p>
         </div>
         <label class="dropzone" for="reportFiles">
           <input id="reportFiles" type="file" multiple accept=".k2report,.report,.txt,text/plain" />
           <span class="drop-icon">+</span>
-          <span>选择或拖入一个/多个报告文件</span>
+          <span data-i18n="upload.hint">选择或拖入一个/多个报告文件</span>
         </label>
       </section>
 
-      <section class="controls" aria-label="判读设置">
+      <section class="controls" aria-label="Settings">
         <label>
-          样本类型
+          <span data-i18n="ctrl.sampleType">样本类型</span>
           <select id="sampleType">
-            <option value="clinical">临床样本</option>
-            <option value="respiratory">呼吸道样本</option>
-            <option value="blood">血液/无菌体液</option>
-            <option value="csf">脑脊液</option>
-            <option value="stool">肠道/粪便样本</option>
-            <option value="environment">环境/水体样本</option>
+            <option value="clinical" data-i18n="stype.clinical">临床样本</option>
+            <option value="respiratory" data-i18n="stype.respiratory">呼吸道样本</option>
+            <option value="blood" data-i18n="stype.blood">血液/无菌体液</option>
+            <option value="csf" data-i18n="stype.csf">脑脊液</option>
+            <option value="stool" data-i18n="stype.stool">肠道/粪便样本</option>
+            <option value="environment" data-i18n="stype.environment">环境/水体样本</option>
           </select>
         </label>
         <label>
-          比较指标
+          <span data-i18n="ctrl.metric">比较指标</span>
           <select id="metric">
-            <option value="percent">clade 百分比</option>
+            <option value="percent" data-i18n="metric.percent">clade 百分比</option>
             <option value="cladeReads">clade reads</option>
             <option value="directReads">direct reads</option>
-            <option value="score">证据分</option>
+            <option value="score" data-i18n="metric.score">证据分</option>
           </select>
         </label>
         <label>
-          最低 direct reads
+          <span data-i18n="ctrl.minDirect">最低 direct reads</span>
           <input id="minDirect" type="number" min="0" step="1" value="1" />
         </label>
         <label>
-          Top N
+          <span>Top N</span>
           <input id="topN" type="number" min="5" max="50" step="1" value="20" />
         </label>
         <label class="check">
           <input id="hideBackground" type="checkbox" checked />
-          隐藏背景/暂不报告
+          <span data-i18n="ctrl.hideBackground">隐藏背景/暂不报告</span>
         </label>
       </section>
 
@@ -70,21 +73,21 @@
         <div class="empty-visual" aria-hidden="true">
           <span></span><span></span><span></span><span></span>
         </div>
-        <h2>等待报告文件</h2>
-        <p>上传后会自动生成病原体检出摘要、证据表、组成图和多样本矩阵。</p>
+        <h2 data-i18n="empty.title">等待报告文件</h2>
+        <p data-i18n="empty.desc">上传后会自动生成病原体检出摘要、证据表、组成图和多样本矩阵。</p>
       </section>
 
-      <section id="singleView" class="view active" aria-label="单样本报告">
+      <section id="singleView" class="view active" aria-label="Single sample report">
         <div class="section-head">
           <div>
-            <p class="eyebrow">single sample</p>
-            <h2 id="singleTitle">单样本报告</h2>
+            <p class="eyebrow" data-i18n="single.eyebrow">single sample</p>
+            <h2 id="singleTitle" data-i18n="single.title">单样本报告</h2>
           </div>
           <div class="section-actions">
-            <a class="action-btn secondary" href="docs.html" target="_blank" rel="noopener">判读说明</a>
-            <a class="action-btn secondary" href="database.html" target="_blank" rel="noopener">病原体条目</a>
-            <select id="sampleSelect" aria-label="选择样本"></select>
-            <button id="exportSingle" class="action-btn" type="button">下载报告 HTML</button>
+            <a class="action-btn secondary" href="docs.html" target="_blank" rel="noopener" data-i18n="nav.docs">判读说明</a>
+            <a class="action-btn secondary" href="database.html" target="_blank" rel="noopener" data-i18n="nav.database">病原体条目</a>
+            <select id="sampleSelect" aria-label="Select sample"></select>
+            <button id="exportSingle" class="action-btn" type="button" data-i18n="single.exportHtml">下载报告 HTML</button>
           </div>
         </div>
 
@@ -93,7 +96,7 @@
         <section class="report-band">
           <div>
             <p class="eyebrow">interpretation</p>
-            <h3>自动判读摘要</h3>
+            <h3 data-i18n="single.interpretation">自动判读摘要</h3>
           </div>
           <p id="interpretationText"></p>
         </section>
@@ -101,21 +104,21 @@
         <div class="single-stack">
           <section class="panel">
             <div class="panel-head">
-              <h3>重点病原体检出</h3>
-              <span id="pathogenCount" class="pill">0 项</span>
+              <h3 data-i18n="single.pathogenTable">重点病原体检出</h3>
+              <span id="pathogenCount" class="pill">0</span>
             </div>
             <div class="table-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>判读 <span class="help" data-tip="按规则分层后的复核优先级：重点关注、需复核、低丰度线索、背景/暂不报告。">?</span></th>
-                    <th>病原体 <span class="help" data-tip="Kraken2 注释到的 taxon 名称；若在内置库中，会显示中文名。">?</span></th>
-                    <th>类型 <span class="help" data-tip="细菌、病毒、真菌、寄生虫/原虫、寄生虫/蠕虫等规则分类。">?</span></th>
-                    <th>证据分 <span class="help" data-tip="0-100 的内部证据分，综合病原体库命中、风险等级、direct reads、clade reads、species 层级和 minimizer 数量。不是阳性概率。">?</span></th>
-                    <th>clade% <span class="help" data-tip="该 taxon 及其所有子节点占总 classified/unclassified reads 的百分比，来自 Kraken2 report 第一列。">?</span></th>
-                    <th>clade reads <span class="help" data-tip="分配到该 taxon 及其子节点的 reads 数。">?</span></th>
-                    <th>direct reads <span class="help" data-tip="直接分配到该 taxon 本身的 reads 数，通常比 clade reads 更适合判断明确命中。">?</span></th>
-                    <th>minimizers <span class="help" data-tip="distinct / total minimizers。不同 minimizer 数越多，说明命中证据分布越丰富；少数 minimizer 重复命中需谨慎。">?</span></th>
+                    <th><span data-i18n="th.status">判读</span> <span class="help" data-i18n-tip="help.status" data-tip="">?</span></th>
+                    <th><span data-i18n="th.pathogen">病原体</span> <span class="help" data-i18n-tip="help.pathogen" data-tip="">?</span></th>
+                    <th><span data-i18n="th.type">类型</span> <span class="help" data-i18n-tip="help.type" data-tip="">?</span></th>
+                    <th><span data-i18n="th.score">证据分</span> <span class="help" data-i18n-tip="help.score" data-tip="">?</span></th>
+                    <th><span data-i18n="th.cladePct">clade%</span> <span class="help" data-i18n-tip="help.cladePct" data-tip="">?</span></th>
+                    <th><span data-i18n="th.cladeReads">clade reads</span> <span class="help" data-i18n-tip="help.cladeReads" data-tip="">?</span></th>
+                    <th><span data-i18n="th.directReads">direct reads</span> <span class="help" data-i18n-tip="help.directReads" data-tip="">?</span></th>
+                    <th><span data-i18n="th.minimizers">minimizers</span> <span class="help" data-i18n-tip="help.minimizers" data-tip="">?</span></th>
                   </tr>
                 </thead>
                 <tbody id="pathogenTable"></tbody>
@@ -127,27 +130,27 @@
         <div class="single-stack">
           <section class="panel">
             <div class="panel-head">
-              <h3>域级组成概览</h3>
-              <span class="pill">降噪视图</span>
+              <h3 data-i18n="single.domainChart">域级组成概览</h3>
+              <span class="pill" data-i18n="single.denoise">降噪视图</span>
             </div>
             <div id="domainChart" class="chart compact"></div>
           </section>
 
           <section class="panel">
             <div class="panel-head">
-              <h3>原始分类树检索</h3>
-              <input id="treeSearch" type="search" placeholder="输入名称或 taxid" />
+              <h3 data-i18n="single.tree">原始分类树检索</h3>
+              <input id="treeSearch" type="search" data-i18n-placeholder="single.treePlaceholder" placeholder="输入名称或 taxid" />
             </div>
             <div class="table-wrap tree-wrap">
               <table>
                 <thead>
                   <tr>
-                    <th>Taxon</th>
-                    <th>Rank</th>
-                    <th>TaxID</th>
-                    <th>clade%</th>
-                    <th>clade reads</th>
-                    <th>direct reads</th>
+                    <th data-i18n="th.taxon">Taxon</th>
+                    <th data-i18n="th.rank">Rank</th>
+                    <th data-i18n="th.taxid">TaxID</th>
+                    <th data-i18n="th.cladePct">clade%</th>
+                    <th data-i18n="th.cladeReads">clade reads</th>
+                    <th data-i18n="th.directReads">direct reads</th>
                   </tr>
                 </thead>
                 <tbody id="treeTable"></tbody>
@@ -157,33 +160,33 @@
         </div>
       </section>
 
-      <section id="multiView" class="view" aria-label="多样本比较">
+      <section id="multiView" class="view" aria-label="Multi-sample comparison">
         <div class="section-head">
           <div>
-            <p class="eyebrow">cohort comparison</p>
-            <h2>多样本病原体比较</h2>
+            <p class="eyebrow" data-i18n="multi.eyebrow">cohort comparison</p>
+            <h2 data-i18n="multi.title">多样本病原体比较</h2>
           </div>
           <div class="section-actions">
-            <a class="action-btn secondary" href="docs.html" target="_blank" rel="noopener">判读说明</a>
-            <a class="action-btn secondary" href="database.html" target="_blank" rel="noopener">病原体条目</a>
-            <span id="multiSampleCount" class="pill">0 个样本</span>
-            <button id="exportMulti" class="action-btn" type="button">下载比较 HTML</button>
-            <button id="exportMatrixCsv" class="action-btn secondary" type="button">下载矩阵 CSV</button>
+            <a class="action-btn secondary" href="docs.html" target="_blank" rel="noopener" data-i18n="nav.docs">判读说明</a>
+            <a class="action-btn secondary" href="database.html" target="_blank" rel="noopener" data-i18n="nav.database">病原体条目</a>
+            <span id="multiSampleCount" class="pill">0</span>
+            <button id="exportMulti" class="action-btn" type="button" data-i18n="multi.exportHtml">下载比较 HTML</button>
+            <button id="exportMatrixCsv" class="action-btn secondary" type="button" data-i18n="multi.exportCsv">下载矩阵 CSV</button>
           </div>
         </div>
 
         <div class="multi-stack">
           <section class="panel wide">
             <div class="panel-head">
-              <h3>样本检出概览</h3>
-              <span class="pill">按判读等级</span>
+              <h3 data-i18n="multi.overview">样本检出概览</h3>
+              <span class="pill" data-i18n="multi.byStatus">按判读等级</span>
             </div>
             <div id="sampleOverview" class="sample-overview"></div>
           </section>
           <section class="panel wide">
             <div class="panel-head">
-              <h3>病原体检出矩阵</h3>
-              <span id="matrixMetric" class="pill">证据分</span>
+              <h3 data-i18n="multi.matrix">病原体检出矩阵</h3>
+              <span id="matrixMetric" class="pill"></span>
             </div>
             <div id="matrix" class="matrix"></div>
           </section>
@@ -192,10 +195,11 @@
     </main>
 
     <footer class="footer">
-      <p>报告提示：本工具只报告内置重点病原体 taxid 或名称规则命中的 taxon，并按证据分分为重点关注、需复核、低丰度线索和背景/暂不报告；证据分综合 direct reads、clade reads、species 层级、minimizers、风险等级和样本背景，不代表阳性概率。结果应结合样本类型、阴性/空白对照、覆盖度、基因组分布和必要的复核实验解读。</p>
-      <p class="copyright">&copy; 版权所有，由 ldl 开发 · Kraken2 病原体检测报告网页</p>
+      <p data-i18n="footer.notice">报告提示</p>
+      <p class="copyright" data-i18n="footer.copyright">© 版权所有</p>
     </footer>
 
+    <script src="i18n.js"></script>
     <script src="pathogen-db.js"></script>
     <script src="app.js"></script>
   </body>

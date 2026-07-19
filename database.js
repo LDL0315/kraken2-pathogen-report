@@ -16,6 +16,8 @@ const DB_FIELDS = [
   "transmission",
   "sample",
   "note",
+  "quarantineList",
+  "quarantineDisease",
 ];
 
 const dbEls = {
@@ -24,6 +26,7 @@ const dbEls = {
   search: document.querySelector("#dbSearch"),
   upload: document.querySelector("#dbUpload"),
   table: document.querySelector("#dbTable"),
+  tableHead: document.querySelector("#dbTableHead"),
   visibleCount: document.querySelector("#visibleCount"),
   form: document.querySelector("#entryForm"),
   editorTitle: document.querySelector("#editorTitle"),
@@ -47,7 +50,7 @@ dbEls.downloadJson.addEventListener("click", () => downloadText("pathogen-databa
 dbEls.downloadCsv.addEventListener("click", () => downloadText("pathogen-database.csv", toCsv(activeEntries), "text/csv;charset=utf-8"));
 dbEls.downloadTemplate.addEventListener("click", () => downloadText("pathogen-template.csv", toCsv([]), "text/csv;charset=utf-8"));
 dbEls.resetCustom.addEventListener("click", () => {
-  if (!confirm("确定清除当前浏览器保存的病原体条目修改吗？")) return;
+  if (!confirm(I18N.t("db.confirmReset"))) return;
   customEntries = [];
   localStorage.removeItem(STORAGE_KEY);
   activeEntries = mergeEntries();
@@ -60,25 +63,50 @@ dbEls.upload.addEventListener("change", async (event) => {
     const text = await file.text();
     const entries = file.name.toLowerCase().endsWith(".json") ? parseJsonEntries(text) : parseCsvEntries(text);
     mergeUploadedEntries(entries);
-    dbEls.formMessage.textContent = `已导入 ${entries.length} 条记录。`;
+    dbEls.formMessage.textContent = I18N.t("db.imported", { n: entries.length });
   } catch (error) {
-    dbEls.formMessage.textContent = `导入失败：${error.message}`;
+    dbEls.formMessage.textContent = I18N.t("db.importFail", { msg: error.message });
   } finally {
     event.target.value = "";
   }
 });
 
+document.getElementById("langToggle")?.addEventListener("click", () => {
+  I18N.toggleLang();
+  const btn = document.getElementById("langToggle");
+  if (btn) btn.textContent = I18N.t("lang.toggle");
+});
+window.addEventListener("langchange", renderDatabase);
+
 function renderDatabase() {
   activeEntries = mergeEntries();
-  dbEls.status.textContent = `${activeEntries.length} 项`;
+  dbEls.status.textContent = `${activeEntries.length} ${I18N.t("count.items")}`;
   const typeCounts = countBy(activeEntries, (item) => item.type || "待分类");
   dbEls.summary.innerHTML = [
-    summaryCard("基础库", BASE_PATHOGENS.length, "pathogen-db.js"),
-    summaryCard("本地修改", customEntries.length, "localStorage"),
-    summaryCard("细菌", typeCounts.get("细菌") || 0, "Bacteria"),
-    summaryCard("病毒", typeCounts.get("病毒") || 0, "Viruses"),
+    summaryCard(I18N.t("db.baseLib"), BASE_PATHOGENS.length, "pathogen-db.js"),
+    summaryCard(I18N.t("db.customLib"), customEntries.length, "localStorage"),
+    summaryCard(I18N.t("db.bacteria"), typeCounts.get("细菌") || 0, "Bacteria"),
+    summaryCard(I18N.t("db.virus"), typeCounts.get("病毒") || 0, "Viruses"),
   ].join("");
+  renderTableHead();
   renderTable();
+}
+
+function renderTableHead() {
+  dbEls.tableHead.innerHTML = `
+    <th>${escapeHtml(I18N.t("db.edit"))}</th>
+    <th>${escapeHtml(I18N.t("th.source") || "Source")}</th>
+    <th>${escapeHtml(I18N.t("form.zh"))}</th>
+    <th>${escapeHtml(I18N.t("form.ncbiName"))}</th>
+    <th>${escapeHtml(I18N.t("form.taxid"))}</th>
+    <th>${escapeHtml(I18N.t("form.ncbiRank"))}</th>
+    <th>${escapeHtml(I18N.t("form.matchRank"))}</th>
+    <th>${escapeHtml(I18N.t("form.type"))}</th>
+    <th>${escapeHtml(I18N.t("form.severity"))}</th>
+    <th>${escapeHtml(I18N.t("quarantine.label"))}/${escapeHtml(I18N.t("monitoring.label"))}</th>
+    <th>${escapeHtml(I18N.t("form.disease"))}/${escapeHtml(I18N.t("form.syndrome"))}</th>
+    <th>${escapeHtml(I18N.t("form.transmission"))}/${escapeHtml(I18N.t("form.sample"))}</th>
+  `;
 }
 
 function renderTable() {
@@ -86,19 +114,20 @@ function renderTable() {
   const rows = activeEntries
     .filter((item) => !query || searchableText(item).includes(query))
     .slice(0, 700);
-  dbEls.visibleCount.textContent = `${rows.length} 项`;
+  dbEls.visibleCount.textContent = `${rows.length} ${I18N.t("count.items")}`;
   dbEls.table.innerHTML = rows
     .map((item) => `
       <tr>
-        <td><button class="mini-btn" type="button" data-taxid="${escapeHtml(item.taxid)}">编辑</button></td>
-        <td><span class="pill ${item._source === "custom" ? "review" : ""}">${item._source === "custom" ? "本地" : "内置"}</span></td>
+        <td><button class="mini-btn" type="button" data-taxid="${escapeHtml(item.taxid)}">${escapeHtml(I18N.t("db.edit"))}</button></td>
+        <td><span class="pill ${item._source === "custom" ? "review" : ""}">${item._source === "custom" ? escapeHtml(I18N.t("db.local")) : escapeHtml(I18N.t("db.builtin"))}</span></td>
         <td><span class="taxon-name">${escapeHtml(item.zh || item.englishName || item.ncbiName)}</span><span class="subnote">${escapeHtml(item.englishName || "")}</span></td>
         <td>${escapeHtml(item.ncbiName || "-")}</td>
         <td>${escapeHtml(item.taxid)}</td>
         <td><span class="pill ${item.matchRank === "clade" ? "trace" : ""}">${escapeHtml(item.ncbiRank || "-")}</span></td>
-        <td><span class="pill ${item.matchRank === "clade" ? "review" : ""}">${escapeHtml(item.matchRank === "clade" ? "clade 全分支" : "exact 精准")}</span></td>
+        <td><span class="pill ${item.matchRank === "clade" ? "review" : ""}">${escapeHtml(item.matchRank === "clade" ? I18N.t("db.cladeFull") : I18N.t("db.exactPrecise"))}</span></td>
         <td>${escapeHtml(item.type || "-")}</td>
         <td>${escapeHtml(item.severity || "-")}<span class="subnote">${escapeHtml(item.hazardClass || "")}</span></td>
+        <td>${item.quarantineList === "quarantine" ? `<span class="pill quarantine-badge">${escapeHtml(I18N.t("quarantine.label"))}</span><span class="subnote">${escapeHtml(item.quarantineDisease || "")}</span>` : item.quarantineList === "monitoring" ? `<span class="pill monitoring-badge">${escapeHtml(I18N.t("monitoring.label"))}</span><span class="subnote">${escapeHtml(item.quarantineDisease || "")}</span>` : "-"}</td>
         <td>${escapeHtml([item.disease, item.syndrome].filter(Boolean).join(" / ") || "-")}</td>
         <td>${escapeHtml([item.transmission, item.sample].filter(Boolean).join(" / ") || "-")}</td>
       </tr>
@@ -121,7 +150,7 @@ function fillForm(entry = {}) {
   });
   if (!dbEls.form.elements.severity.value) dbEls.form.elements.severity.value = "medium";
   if (!dbEls.form.elements.type.value) dbEls.form.elements.type.value = "细菌";
-  dbEls.editorTitle.textContent = entry.taxid ? `编辑条目：${entry.taxid}` : "新增条目";
+  dbEls.editorTitle.textContent = entry.taxid ? I18N.t("db.editEntry", { id: entry.taxid }) : I18N.t("db.newEntryTitle");
   dbEls.formMessage.textContent = "";
 }
 
@@ -133,12 +162,12 @@ function saveFormEntry(event) {
     if (value) entry[field] = value;
   });
   if (!/^\d+$/.test(entry.taxid || "")) {
-    dbEls.formMessage.textContent = "TaxID 必须是数字。";
+    dbEls.formMessage.textContent = I18N.t("db.taxidMustNum");
     return;
   }
   if (!entry.note) entry.note = buildNote(entry);
   upsertCustomEntry(entry);
-  dbEls.formMessage.textContent = `已保存 TaxID ${entry.taxid}。`;
+  dbEls.formMessage.textContent = I18N.t("db.saved", { id: entry.taxid });
 }
 
 function mergeUploadedEntries(entries) {
@@ -306,6 +335,14 @@ function headerAlias(header) {
     sample: "sample",
     备注: "note",
     note: "note",
+    检疫监测: "quarantineList",
+    检疫传染病: "quarantineList",
+    监测传染病: "quarantineList",
+    quarantinelist: "quarantineList",
+    "quarantine list": "quarantineList",
+    检疫疾病: "quarantineDisease",
+    quarantinedisease: "quarantineDisease",
+    "quarantine disease": "quarantineDisease",
   };
   return aliases[key] || "";
 }

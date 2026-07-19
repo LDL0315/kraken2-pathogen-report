@@ -81,6 +81,29 @@ a {
   border-radius: 8px;
 }
 
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.lang-btn {
+  min-height: 38px;
+  min-width: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #f8fbfa;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.lang-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
 .mode-btn {
   height: 40px;
   border: 0;
@@ -488,6 +511,22 @@ a {
 .pill.background,
 .status-background { background: var(--gray-2); color: #56615e; }
 
+/* Quarantine / Monitoring disease badges */
+.pill.quarantine-badge,
+.badge.quarantine-badge {
+  background: #c0392b;
+  color: #fff;
+  font-weight: 800;
+  border: 1px solid #922b21;
+}
+.pill.monitoring-badge,
+.badge.monitoring-badge {
+  background: #e67e22;
+  color: #fff;
+  font-weight: 800;
+  border: 1px solid #b9651b;
+}
+
 .table-wrap {
   overflow: auto;
   border: 1px solid var(--line);
@@ -838,6 +877,10 @@ tbody tr:last-child td {
 
   .topbar {
     align-items: stretch;
+  }
+
+  .topbar-right {
+    flex-wrap: wrap;
   }
 
   .section-head {

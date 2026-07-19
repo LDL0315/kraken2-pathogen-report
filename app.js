@@ -1,14 +1,14 @@
 const RANK_LABELS = {
-  U: "未分类",
+  U: "unclassified",
   R: "root",
-  D: "域",
-  K: "界",
-  P: "门",
-  C: "纲",
-  O: "目",
-  F: "科",
-  G: "属",
-  S: "种",
+  D: "domain",
+  K: "kingdom",
+  P: "phylum",
+  C: "class",
+  O: "order",
+  F: "family",
+  G: "genus",
+  S: "species",
 };
 
 // PATHOGEN_DB: exact-match entries (species/subspecies/isolate/biotype) + clade-level entries (genus/family)
@@ -19,6 +19,16 @@ const PATHOGEN_DB = new Map();
 // Any descendant species under these taxa is considered a pathogen hit.
 const PATHOGEN_CLADE_TAXIDS = typeof window !== "undefined" && window.PATHOGEN_CLADE_TAXIDS instanceof Set
   ? window.PATHOGEN_CLADE_TAXIDS
+  : new Set();
+
+// QUARANTINE_TAXIDS: 检疫传染病 (国境卫生检疫法 2025) — force highest priority
+const QUARANTINE_TAXIDS = typeof window !== "undefined" && window.QUARANTINE_TAXIDS instanceof Set
+  ? window.QUARANTINE_TAXIDS
+  : new Set();
+
+// MONITORING_TAXIDS: 监测传染病 (国境卫生检疫法 2025) — force highest priority
+const MONITORING_TAXIDS = typeof window !== "undefined" && window.MONITORING_TAXIDS instanceof Set
+  ? window.MONITORING_TAXIDS
   : new Set();
 
 const EXCLUSION_PATTERNS = [
@@ -54,6 +64,8 @@ function applyPathogenRecord(item) {
     transmission: item.transmission || "",
     sample: item.sample || "",
     taxonomy: item.taxonomy || {},
+    quarantineList: item.quarantineList || "",
+    quarantineDisease: item.quarantineDisease || "",
   });
 }
 
@@ -357,13 +369,22 @@ function annotatePathogen(row, sample) {
   if (!db) return null;
   if (excluded && matchSource !== "clade-ancestor") return null;
 
+  // Check quarantine/monitoring status — force highest priority
+  const isQuarantine = db.quarantineList === "quarantine" || QUARANTINE_TAXIDS.has(row.taxid);
+  const isMonitoring = db.quarantineList === "monitoring" || MONITORING_TAXIDS.has(row.taxid);
+
   const type = db.type || "待分类";
-  const severity = db.severity || "medium";
+  // Quarantine/monitoring pathogens are always treated as highest severity
+  const severity = (isQuarantine || isMonitoring) ? "high" : (db.severity || "medium");
   const isCladeMatch = matchSource === "clade-ancestor" || db.matchRank === "clade";
 
   let score = 0;
   // Base score from pathogen database
   score += severity === "high" ? 34 : severity === "medium" ? 26 : 18;
+
+  // Quarantine/monitoring pathogens get maximum base score boost
+  if (isQuarantine) score += 30;
+  else if (isMonitoring) score += 20;
 
   // Clade-level match gets slightly lower base: species identification is less specific
   if (isCladeMatch && !row.rank.startsWith("S")) {
@@ -387,14 +408,29 @@ function annotatePathogen(row, sample) {
   if (isLikelyCommensal(row.name, state.sampleType)) score -= 10;
   score = clamp(Math.round(score), 0, 100);
 
-  const status = classifyStatus(score, row, severity, true, excluded);
-  if (status.key === "background" && !isCladeMatch) return null;
+  const status = classifyStatus(score, row, severity, true, excluded, isQuarantine, isMonitoring);
+  if (status.key === "background" && !isQuarantine && !isMonitoring && !isCladeMatch) return null;
 
   // Build note for clade-ancestor matches
   let note = db.note || "";
   if (matchSource === "clade-ancestor") {
-    const ancestorName = db.zh ? `${db.ncbiName}（${db.zh}）` : db.ncbiName;
-    note = `属级病原体（${ancestorName}）下的物种命中。` + (note ? " " + note : "");
+    const ancestorName = db.zh ? `${db.ncbiName} (${db.zh})` : db.ncbiName;
+    note = (I18N.lang === "zh"
+      ? `属级病原体（${ancestorName}）下的物种命中。`
+      : `Species hit under genus-level pathogen (${ancestorName}).`) + (note ? " " + note : "");
+  }
+
+  // Add quarantine/monitoring disease annotation
+  if (isQuarantine) {
+    const qLabel = I18N.lang === "zh"
+      ? `【检疫传染病】${db.quarantineDisease || ""}（依据《国境卫生检疫法》2025年施行目录）`
+      : `[Quarantine Infectious Disease] ${db.quarantineDisease || ""} (per Frontier Health Quarantine Law, effective 2025)`;
+    note = qLabel + (note ? " " + note : "");
+  } else if (isMonitoring) {
+    const mLabel = I18N.lang === "zh"
+      ? `【监测传染病】${db.quarantineDisease || ""}（依据《国境卫生检疫法》2025年施行目录）`
+      : `[Monitoring Infectious Disease] ${db.quarantineDisease || ""} (per Frontier Health Quarantine Law, effective 2025)`;
+    note = mLabel + (note ? " " + note : "");
   }
 
   return {
@@ -405,6 +441,8 @@ function annotatePathogen(row, sample) {
     status,
     zh: matchSource === "clade-ancestor" ? "" : (db.zh || ""),
     note,
+    quarantineList: isQuarantine ? "quarantine" : (isMonitoring ? "monitoring" : ""),
+    quarantineDisease: db.quarantineDisease || "",
   };
 }
 
@@ -420,23 +458,27 @@ function findCladePathogenAncestor(row, sample) {
   return null;
 }
 
-function classifyStatus(score, row, severity, inDb, excluded) {
+function classifyStatus(score, row, severity, inDb, excluded, isQuarantine, isMonitoring) {
+  // Quarantine/monitoring infectious diseases: always highest priority
+  if (isQuarantine || isMonitoring) {
+    return { key: "critical", label: I18N.t("status.critical") };
+  }
   if (excluded || score < 25 || row.directReads < state.minDirect) {
-    return { key: "background", label: "背景/暂不报告" };
+    return { key: "background", label: I18N.t("status.background") };
   }
   if (row.directReads < 5 && severity !== "high") {
-    return { key: "trace", label: "低丰度线索" };
+    return { key: "trace", label: I18N.t("status.trace") };
   }
   if (severity === "low" && score < 90) {
-    return score >= 50 ? { key: "review", label: "需复核" } : { key: "trace", label: "低丰度线索" };
+    return score >= 50 ? { key: "review", label: I18N.t("status.review") } : { key: "trace", label: I18N.t("status.trace") };
   }
   if (score >= 72 || (inDb && severity === "high" && row.directReads >= 20)) {
-    return { key: "critical", label: "重点关注" };
+    return { key: "critical", label: I18N.t("status.critical") };
   }
   if (score >= 50 || (inDb && row.directReads >= 10)) {
-    return { key: "review", label: "需复核" };
+    return { key: "review", label: I18N.t("status.review") };
   }
-  return { key: "trace", label: "低丰度线索" };
+  return { key: "trace", label: I18N.t("status.trace") };
 }
 
 function isLikelyCommensal(name, sampleType) {
@@ -466,7 +508,7 @@ function renderSingle() {
   const sample = state.samples[state.selectedSample];
   const visibleHits = getVisibleHits(sample);
   els.singleTitle.textContent = sample.fileName;
-  els.pathogenCount.textContent = `${visibleHits.length} 项`;
+  els.pathogenCount.textContent = `${visibleHits.length} ${I18N.t("count.items")}`;
 
   const critical = sample.pathogenHits.filter((hit) => hit.status.key === "critical").length;
   const review = sample.pathogenHits.filter((hit) => hit.status.key === "review").length;
@@ -474,10 +516,10 @@ function renderSingle() {
   const classifiedPct = sample.totalReads ? (sample.classifiedReads / sample.totalReads) * 100 : 0;
 
   els.summaryCards.innerHTML = [
-    summaryCard("重点关注", critical, "建议优先复核"),
-    summaryCard("需复核", review, "有病原体线索"),
-    summaryCard("低丰度线索", trace, "谨慎解释"),
-    summaryCard("分类 reads", formatPct(classifiedPct), `${formatInt(sample.classifiedReads)} / ${formatInt(sample.totalReads)}`),
+    summaryCard(I18N.t("summary.critical"), critical, I18N.t("summary.criticalHint")),
+    summaryCard(I18N.t("summary.review"), review, I18N.t("summary.reviewHint")),
+    summaryCard(I18N.t("summary.trace"), trace, I18N.t("summary.traceHint")),
+    summaryCard(I18N.t("summary.classified"), formatPct(classifiedPct), `${formatInt(sample.classifiedReads)} / ${formatInt(sample.totalReads)}`),
   ].join("");
 
   els.interpretationText.textContent = makeInterpretation(sample);
@@ -516,22 +558,22 @@ function makeInterpretation(sample) {
   const critical = sample.pathogenHits.filter((hit) => hit.status.key === "critical");
   const review = sample.pathogenHits.filter((hit) => hit.status.key === "review");
   const trace = sample.pathogenHits.filter((hit) => hit.status.key === "trace");
-  const names = critical.slice(0, 3).map((hit) => displayName(hit)).join("、");
+  const names = critical.slice(0, 3).map((hit) => displayName(hit)).join(I18N.lang === "zh" ? "、" : ", ");
   if (critical.length) {
-    return `本样本检出 ${critical.length} 个重点关注病原体线索，${names} 的证据强度最高。建议结合样本类型、阴性/空白对照、参考基因组覆盖分布、重复比对或靶向实验进行复核；Kraken2/nt 结果不应单独作为临床确诊依据。`;
+    return I18N.t("interp.critical", { n: critical.length, names });
   }
   if (review.length) {
-    return `本样本未达到重点关注阈值，但有 ${review.length} 个需复核病原体线索。建议优先查看 direct reads、minimizer 数量、同属近缘物种是否共同命中，以及对照样本中是否存在相同背景。`;
+    return I18N.t("interp.review", { n: review.length });
   }
   if (trace.length) {
-    return `本样本仅见 ${trace.length} 个低丰度病原体线索，当前更适合作为筛查提示。若样本来自无菌部位或目标病原高度相关，可进一步复核覆盖度和原始 reads。`;
+    return I18N.t("interp.trace", { n: trace.length });
   }
-  return "本样本未见达到当前阈值的重点病原体线索。仍建议结合样本质量、测序深度和对照结果判断是否需要降低阈值或补充复核。";
+  return I18N.t("interp.none");
 }
 
 function renderPathogenTable(hits) {
   if (!hits.length) {
-    els.pathogenTable.innerHTML = `<tr><td colspan="8" class="muted">当前阈值下没有可报告病原体线索。</td></tr>`;
+    els.pathogenTable.innerHTML = `<tr><td colspan="8" class="muted">${escapeHtml(I18N.t("table.noHits"))}</td></tr>`;
     return;
   }
 
@@ -539,11 +581,17 @@ function renderPathogenTable(hits) {
     .map((hit) => {
       const row = hit.row;
       const minimizers = row.distinctMinimizers === null ? "NA" : `${formatInt(row.distinctMinimizers)} / ${formatInt(row.totalMinimizers)}`;
+      const qBadge = hit.quarantineList === "quarantine"
+        ? `<span class="pill quarantine-badge">${I18N.t("quarantine.label")}</span>`
+        : hit.quarantineList === "monitoring"
+        ? `<span class="pill monitoring-badge">${I18N.t("monitoring.label")}</span>`
+        : "";
       return `
         <tr>
           <td><span class="pill ${hit.status.key}">${hit.status.label}</span></td>
           <td>
             <span class="taxon-name">${escapeHtml(displayName(hit))}</span>
+            ${qBadge}
             <span class="subnote">taxid ${escapeHtml(row.taxid)} · ${escapeHtml(hit.note)}</span>
           </td>
           <td>${escapeHtml(hit.type)}</td>
@@ -620,7 +668,7 @@ function renderTree() {
 }
 
 function renderMulti() {
-  els.multiSampleCount.textContent = `${state.samples.length} 个样本`;
+  els.multiSampleCount.textContent = `${state.samples.length} ${I18N.t("count.samples")}`;
   els.matrixMetric.textContent = metricLabel(state.metric);
   renderSampleOverview();
   renderMatrix();
@@ -640,7 +688,7 @@ function renderSampleOverview() {
             <span class="status-trace" style="width:${(counts.trace / total) * 100}%"></span>
             <span class="status-background" style="width:${(counts.background / total) * 100}%"></span>
           </div>
-          <span class="subnote">重点 ${counts.critical} · 复核 ${counts.review} · 低丰度 ${counts.trace} · 背景 ${counts.background}</span>
+          <span class="subnote">${I18N.t("summary.critical")} ${counts.critical} · ${I18N.t("summary.review")} ${counts.review} · ${I18N.t("summary.trace")} ${counts.trace} · ${I18N.t("status.background")} ${counts.background}</span>
         </div>
       `;
     })
@@ -650,14 +698,14 @@ function renderSampleOverview() {
 function renderMatrix() {
   const taxa = collectMatrixTaxa();
   if (!taxa.length) {
-    els.matrix.innerHTML = `<p class="subnote" style="padding:14px">当前阈值下没有可比较的病原体线索。</p>`;
+    els.matrix.innerHTML = `<p class="subnote" style="padding:14px">${escapeHtml(I18N.t("table.noMatrix"))}</p>`;
     return;
   }
 
   const columns = state.samples.length + 1;
   const template = `minmax(220px, 280px) repeat(${state.samples.length}, minmax(120px, 1fr))`;
   let html = `<div class="matrix-grid" style="grid-template-columns:${template}">`;
-  html += `<div class="matrix-head">病原体</div>`;
+  html += `<div class="matrix-head">${escapeHtml(I18N.t("th.pathogen"))}</div>`;
   html += state.samples.map((sample) => `<div class="matrix-head">${escapeHtml(shortName(sample.fileName))}</div>`).join("");
 
   taxa.forEach((taxon) => {
@@ -678,63 +726,63 @@ function buildSingleReportHtml(sample) {
   const hits = getVisibleHits(sample);
   const counts = countStatuses(sample.pathogenHits);
   const classifiedPct = sample.totalReads ? (sample.classifiedReads / sample.totalReads) * 100 : 0;
-  const title = `${shortName(sample.fileName)} 病原体检测报告`;
+  const title = I18N.t("report.singleTitle", { name: shortName(sample.fileName) });
   const hitRows = hits.length
     ? hits.map((hit) => reportHitRow(hit)).join("")
-    : `<tr><td colspan="9">当前阈值下没有可报告病原体线索。</td></tr>`;
+    : `<tr><td colspan="9">${escapeHtml(I18N.t("table.noHits"))}</td></tr>`;
 
   return reportDocument(
     title,
     `
       <section class="hero">
-        <p class="eyebrow">single sample report</p>
+        <p class="eyebrow">${escapeHtml(I18N.t("report.singleEyebrow"))}</p>
         <h1>${escapeHtml(title)}</h1>
         <p>${escapeHtml(makeInterpretation(sample))}</p>
       </section>
       <section class="summary">
-        ${reportMetric("重点关注", counts.critical)}
-        ${reportMetric("需复核", counts.review)}
-        ${reportMetric("低丰度线索", counts.trace)}
-        ${reportMetric("分类 reads", formatPct(classifiedPct), `${formatInt(sample.classifiedReads)} / ${formatInt(sample.totalReads)}`)}
+        ${reportMetric(I18N.t("summary.critical"), counts.critical)}
+        ${reportMetric(I18N.t("summary.review"), counts.review)}
+        ${reportMetric(I18N.t("summary.trace"), counts.trace)}
+        ${reportMetric(I18N.t("summary.classified"), formatPct(classifiedPct), `${formatInt(sample.classifiedReads)} / ${formatInt(sample.totalReads)}`)}
       </section>
       ${reportSettingsBlock()}
       <section>
-        <h2>重点病原体检出</h2>
+        <h2>${escapeHtml(I18N.t("single.pathogenTable"))}</h2>
         <table>
           <thead>
             <tr>
-              <th>判读</th>
-              <th>病原体</th>
-              <th>TaxID</th>
-              <th>类型</th>
-              <th>证据分</th>
-              <th>clade%</th>
-              <th>clade reads</th>
-              <th>direct reads</th>
-              <th>minimizers</th>
+              <th>${escapeHtml(I18N.t("th.status"))}</th>
+              <th>${escapeHtml(I18N.t("th.pathogen"))}</th>
+              <th>${escapeHtml(I18N.t("th.taxid"))}</th>
+              <th>${escapeHtml(I18N.t("th.type"))}</th>
+              <th>${escapeHtml(I18N.t("th.score"))}</th>
+              <th>${escapeHtml(I18N.t("th.cladePct"))}</th>
+              <th>${escapeHtml(I18N.t("th.cladeReads"))}</th>
+              <th>${escapeHtml(I18N.t("th.directReads"))}</th>
+              <th>${escapeHtml(I18N.t("th.minimizers"))}</th>
             </tr>
           </thead>
           <tbody>${hitRows}</tbody>
         </table>
       </section>
       <section>
-        <h2>判读标准与列说明</h2>
-        <p class="method-text">本研究采用一款基于浏览器的本地化病原体筛查工具对 Kraken2 分类结果进行判读。该工具读取 <code>.k2report</code> 报告文件，通过内置的《人间传染病名录》病原体知识库（500 条目）对每个分类单元进行注释。知识库采用两级匹配策略：种级及以下条目（species/subspecies/isolate/biotype）执行精确 TaxID 匹配；属级及以上条目（genus/family/species group）执行分支级匹配，即该分类下所有子代物种均视为潜在病原体检出。工具综合知识库命中、危害程度、reads 分布、分类层级和 minimizer 信息计算证据分，并将结果分为"重点关注""需复核""低丰度线索""背景/暂不报告"四个等级。全部数据处理在浏览器本地完成，无需上传至服务器，可输出交互式 HTML 报告、多样本比较矩阵及 CSV 汇总表。</p>
-        <h3>列说明</h3>
+        <h2>${escapeHtml(I18N.t("report.criteriaTitle"))}</h2>
+        <p class="method-text">${escapeHtml(I18N.t("method.text"))}</p>
+        <h3>${escapeHtml(I18N.t("report.colDefs"))}</h3>
         <div class="col-def">
-        <p><strong>判读</strong>：软件给出的复核优先级，包括重点关注、需复核、低丰度线索、背景/暂不报告。该字段用于提示后续复核顺序，不代表临床确诊结论。</p>
-        <p><strong>病原体</strong>：Kraken2 注释到的 taxon 名称。若该 TaxID 命中病原体知识库，会同时显示中文名；下方备注可能包含 TaxID、危害程度、BSL 等级、相关疾病、传播途径和建议样本类型等信息。</p>
-        <p><strong>TaxID</strong>：NCBI taxonomy ID，用于合并多样本和连接病原体知识库。</p>
-        <p><strong>类型</strong>：病原体类别，来自知识库或补充规则，例如细菌、病毒、真菌、寄生虫/原虫、寄生虫/蠕虫、待分类。该字段也会影响展示排序。</p>
-        <p><strong>证据分</strong>：软件内部计算的 0–100 分值，用于衡量该 taxon 的复核优先级。分值综合知识库命中、风险等级、clade reads、direct reads、分类层级、minimizer 数量和背景扣分等因素。证据分不是阳性概率，也不是临床确诊置信度百分比。</p>
-        <p><strong>clade%</strong>：Kraken2 report 中该 taxon 及其所有子节点 reads 占总 reads 的比例。它是树状累计比例，例如某个 genus 的 clade% 包含其下所有 species 的 reads。</p>
-        <p><strong>clade reads</strong>：分配到该 taxon 及其所有子节点的 reads 数。该值适合观察某个分类分支的总体信号，但不能单独说明 reads 都明确属于该 taxon 本身。</p>
-        <p><strong>direct reads</strong>：直接分配到该 taxon 本身的 reads 数。相比 clade reads，该值更适合判断该 taxon 是否有明确命中；对于病原体筛查，direct reads 通常是更重要的证据之一。</p>
-        <p><strong>minimizers</strong>：仅在 Kraken2 report 使用 <code>--report-minimizer-data</code> 时显示，格式为 distinct minimizers / total minimizers。distinct minimizers 表示不同 minimizer 的数量，total minimizers 表示 minimizer 命中的总次数。distinct 越多通常说明证据分布越丰富；total 较高但 distinct 很少时，需要谨慎解读。</p>
+        <p><strong>${escapeHtml(I18N.t("th.status"))}</strong>：${escapeHtml(I18N.t("col.status"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.pathogen"))}</strong>：${escapeHtml(I18N.t("col.pathogen"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.taxid"))}</strong>：${escapeHtml(I18N.t("col.taxid"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.type"))}</strong>：${escapeHtml(I18N.t("col.type"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.score"))}</strong>：${escapeHtml(I18N.t("col.score"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.cladePct"))}</strong>：${escapeHtml(I18N.t("col.cladePct"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.cladeReads"))}</strong>：${escapeHtml(I18N.t("col.cladeReads"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.directReads"))}</strong>：${escapeHtml(I18N.t("col.directReads"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.minimizers"))}</strong>：${escapeHtml(I18N.t("col.minimizers"))}</p>
         </div>
       </section>
       <section>
-        <h2>报告提示</h2>
+        <h2>${escapeHtml(I18N.t("report.noticeTitle"))}</h2>
         <p class="note">${escapeHtml(reportNotice())}</p>
       </section>
     `,
@@ -745,7 +793,7 @@ function buildMultiReportHtml() {
   const taxa = collectMatrixTaxa();
   const matrixRows = taxa.length
     ? taxa.map((taxon) => reportMatrixRow(taxon)).join("")
-    : `<tr><td colspan="${state.samples.length + 1}">当前阈值下没有可比较的病原体线索。</td></tr>`;
+    : `<tr><td colspan="${state.samples.length + 1}">${escapeHtml(I18N.t("table.noMatrix"))}</td></tr>`;
   const overviewRows = state.samples
     .map((sample) => {
       const counts = countStatuses(sample.pathogenHits);
@@ -764,24 +812,24 @@ function buildMultiReportHtml() {
     .join("");
 
   return reportDocument(
-    `Kraken2 多样本病原体比较报告`,
+    I18N.t("report.multiTitle"),
     `
       <section class="hero">
-        <p class="eyebrow">cohort comparison report</p>
-        <h1>多样本病原体比较报告</h1>
-        <p>共纳入 ${state.samples.length} 个样本，矩阵指标为 ${escapeHtml(metricLabel(state.metric))}，显示当前阈值和 Top N 设置下的病原体线索。</p>
+        <p class="eyebrow">${escapeHtml(I18N.t("report.multiEyebrow"))}</p>
+        <h1>${escapeHtml(I18N.t("report.multiTitle"))}</h1>
+        <p>${escapeHtml(I18N.t("report.multiDesc", { n: state.samples.length, metric: metricLabel(state.metric) }))}</p>
       </section>
       ${reportSettingsBlock()}
       <section>
-        <h2>样本检出概览</h2>
+        <h2>${escapeHtml(I18N.t("multi.overview"))}</h2>
         <table>
           <thead>
             <tr>
-              <th>样本</th>
-              <th>重点关注</th>
-              <th>需复核</th>
-              <th>低丰度线索</th>
-              <th>背景/暂不报告</th>
+              <th>${escapeHtml(I18N.t("report.sample"))}</th>
+              <th>${escapeHtml(I18N.t("summary.critical"))}</th>
+              <th>${escapeHtml(I18N.t("summary.review"))}</th>
+              <th>${escapeHtml(I18N.t("summary.trace"))}</th>
+              <th>${escapeHtml(I18N.t("status.background"))}</th>
               <th>classified reads</th>
               <th>total reads</th>
             </tr>
@@ -790,11 +838,11 @@ function buildMultiReportHtml() {
         </table>
       </section>
       <section>
-        <h2>病原体检出矩阵</h2>
+        <h2>${escapeHtml(I18N.t("multi.matrix"))}</h2>
         <table>
           <thead>
             <tr>
-              <th>病原体</th>
+              <th>${escapeHtml(I18N.t("th.pathogen"))}</th>
               ${state.samples.map((sample) => `<th>${escapeHtml(shortName(sample.fileName))}</th>`).join("")}
             </tr>
           </thead>
@@ -802,13 +850,24 @@ function buildMultiReportHtml() {
         </table>
       </section>
       <section>
-        <h2>判读标准与列说明</h2>
-        <div class="criteria">${criteriaHtml()}</div>
-        ${columnDefinitionsHtml()}
+        <h2>${escapeHtml(I18N.t("report.criteriaTitle"))}</h2>
+        <p class="method-text">${escapeHtml(I18N.t("method.text"))}</p>
+        <h3>${escapeHtml(I18N.t("report.colDefs"))}</h3>
+        <div class="col-def">
+        <p><strong>${escapeHtml(I18N.t("th.status"))}</strong>：${escapeHtml(I18N.t("col.status"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.pathogen"))}</strong>：${escapeHtml(I18N.t("col.pathogen"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.taxid"))}</strong>：${escapeHtml(I18N.t("col.taxid"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.type"))}</strong>：${escapeHtml(I18N.t("col.type"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.score"))}</strong>：${escapeHtml(I18N.t("col.score"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.cladePct"))}</strong>：${escapeHtml(I18N.t("col.cladePct"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.cladeReads"))}</strong>：${escapeHtml(I18N.t("col.cladeReads"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.directReads"))}</strong>：${escapeHtml(I18N.t("col.directReads"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.minimizers"))}</strong>：${escapeHtml(I18N.t("col.minimizers"))}</p>
+        </div>
       </section>
       <section>
-        <h2>报告提示</h2>
-        <p class="note">${escapeHtml(reportNotice())} 多样本比较用于定位样本间共同或差异性病原体线索。若用于正式报告，建议加入批次阴性/空白对照、阳性对照、覆盖度和污染背景库。</p>
+        <h2>${escapeHtml(I18N.t("report.noticeTitle"))}</h2>
+        <p class="note">${escapeHtml(reportNotice())} ${escapeHtml(I18N.t("report.multiNotice"))}</p>
       </section>
     `,
   );
@@ -842,10 +901,15 @@ function buildMatrixCsv() {
 function reportHitRow(hit) {
   const row = hit.row;
   const minimizers = row.distinctMinimizers === null ? "NA" : `${formatInt(row.distinctMinimizers)} / ${formatInt(row.totalMinimizers)}`;
+  const qBadge = hit.quarantineList === "quarantine"
+    ? ` <span class="badge quarantine-badge">${escapeHtml(I18N.t("quarantine.label"))}</span>`
+    : hit.quarantineList === "monitoring"
+    ? ` <span class="badge monitoring-badge">${escapeHtml(I18N.t("monitoring.label"))}</span>`
+    : "";
   return `
     <tr>
       <td><span class="badge ${hit.status.key}">${hit.status.label}</span></td>
-      <td><strong>${escapeHtml(displayName(hit))}</strong><span>${escapeHtml(hit.note)}</span></td>
+      <td><strong>${escapeHtml(displayName(hit))}</strong>${qBadge}<span>${escapeHtml(hit.note)}</span></td>
       <td>${escapeHtml(row.taxid)}</td>
       <td>${escapeHtml(hit.type)}</td>
       <td>${hit.score}/100</td>
@@ -875,11 +939,11 @@ function reportMatrixRow(taxon) {
 function reportSettingsBlock() {
   return `
     <section class="settings">
-      <div><strong>样本类型</strong><span>${escapeHtml(sampleTypeLabel(state.sampleType))}</span></div>
-      <div><strong>指标</strong><span>${escapeHtml(metricLabel(state.metric))}</span></div>
-      <div><strong>最低 direct reads</strong><span>${state.minDirect}</span></div>
+      <div><strong>${escapeHtml(I18N.t("ctrl.sampleType"))}</strong><span>${escapeHtml(sampleTypeLabel(state.sampleType))}</span></div>
+      <div><strong>${escapeHtml(I18N.t("report.metricLabel"))}</strong><span>${escapeHtml(metricLabel(state.metric))}</span></div>
+      <div><strong>${escapeHtml(I18N.t("ctrl.minDirect"))}</strong><span>${state.minDirect}</span></div>
       <div><strong>Top N</strong><span>${state.topN}</span></div>
-      <div><strong>背景项</strong><span>${state.hideBackground ? "隐藏" : "显示"}</span></div>
+      <div><strong>${escapeHtml(I18N.t("ctrl.hideBackground"))}</strong><span>${state.hideBackground ? I18N.t("report.bgHidden") : I18N.t("report.bgShown")}</span></div>
     </section>
   `;
 }
@@ -904,7 +968,7 @@ function columnDefinitionsHtml() {
 }
 
 function reportNotice() {
-  return "本报告基于 Kraken2 report 进行本地规则分层，输出的是检测线索和复核优先级，不是临床确诊结论。正式解释应结合样本类型、阴性/空白对照、覆盖度、基因组分布、近缘物种误分配和必要的复核实验。";
+  return I18N.t("report.notice");
 }
 
 function reportMetric(label, value, hint = "") {
@@ -918,8 +982,10 @@ function reportMetric(label, value, hint = "") {
 }
 
 function reportDocument(title, body) {
+  const lang = I18N.lang === "zh" ? "zh-CN" : "en";
+  const localeStr = new Date().toLocaleString(lang === "zh-CN" ? "zh-CN" : "en-US");
   return `<!doctype html>
-<html lang="zh-CN">
+<html lang="${lang}">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -929,7 +995,7 @@ function reportDocument(title, body) {
   <body>
     <main>
       ${body}
-      <footer>生成时间：${escapeHtml(new Date().toLocaleString("zh-CN"))} · Kraken2 病原体检测报告网页</footer>
+      <footer>${escapeHtml(I18N.t("report.generated", { time: localeStr }))}</footer>
     </main>
   </body>
 </html>`;
@@ -943,7 +1009,7 @@ function reportCss() {
     .hero{background:#152622;color:#f8fbfa}.hero p{color:#dce8e4;max-width:920px}.eyebrow{margin:0 0 6px;color:#7aa696;font-size:12px;font-weight:800;text-transform:uppercase}.hero h1{margin:0;font-size:34px}
     h2{margin:0 0 12px;font-size:20px}h3{margin:0 0 6px;font-size:15px}.summary,.settings,.definitions{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.summary div,.settings div,.definitions div,.criteria div,.db-report-group{border:1px solid #d9e0dd;border-radius:8px;padding:12px;background:#fbfcfc}.summary span,.settings strong,.definitions strong{display:block;color:#66736f;font-size:12px}.summary strong{display:block;margin-top:6px;font-size:28px}.summary em,.settings span,.definitions span{display:block;margin-top:4px;color:#66736f;font-size:12px;font-style:normal}.criteria{display:grid;gap:8px;margin-bottom:12px}.criteria strong{color:#17201f}.db-report-group{margin-top:10px}.db-report-group p{margin:0;color:#66736f;font-size:13px;line-height:1.55}.method-text{font-size:14px;line-height:1.9;margin:0 0 1em;color:#333}.col-def p{margin:0.35em 0;font-size:14px;line-height:1.75;color:#444}
     .command-block{overflow:auto;margin:10px 0 16px;border:1px solid #d9e0dd;border-radius:8px;background:#152622;color:#f8fbfa;padding:14px;line-height:1.45}.command-block code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:13px}
-    table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px;border-bottom:1px solid #d9e0dd;text-align:left;vertical-align:top}th{background:#f9fbfa;color:#56615e;font-size:12px}td span{display:block;color:#66736f;font-size:12px;margin-top:3px}.badge{display:inline-block;margin:0;padding:4px 8px;border-radius:999px;font-weight:800}.critical{background:#f3d7d7;color:#832626}.review{background:#f4e1c2;color:#754708}.trace{background:#d6e4f4;color:#224d75}.background{background:#e8eceb;color:#56615e}.empty{color:#9aa5a1}.note,footer{color:#66736f;font-size:13px}footer{margin-top:18px}
+    table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px;border-bottom:1px solid #d9e0dd;text-align:left;vertical-align:top}th{background:#f9fbfa;color:#56615e;font-size:12px}td span{display:block;color:#66736f;font-size:12px;margin-top:3px}.badge{display:inline-block;margin:0 4px 2px 0;padding:4px 8px;border-radius:999px;font-weight:800}.critical{background:#f3d7d7;color:#832626}.review{background:#f4e1c2;color:#754708}.trace{background:#d6e4f4;color:#224d75}.background{background:#e8eceb;color:#56615e}.quarantine-badge{background:#c0392b;color:#fff;border:1px solid #922b21}.monitoring-badge{background:#e67e22;color:#fff;border:1px solid #b9651b}.empty{color:#9aa5a1}.note,footer{color:#66736f;font-size:13px}footer{margin-top:18px}
   `;
 }
 
@@ -1047,21 +1113,21 @@ function rawMetricValue(hit) {
 
 function metricLabel(metric) {
   return {
-    percent: "clade 百分比",
-    cladeReads: "clade reads",
-    directReads: "direct reads",
-    score: "证据分",
+    percent: I18N.t("metric.percent"),
+    cladeReads: I18N.t("metric.cladeReads"),
+    directReads: I18N.t("metric.directReads"),
+    score: I18N.t("metric.score"),
   }[metric];
 }
 
 function sampleTypeLabel(value) {
   return {
-    clinical: "临床样本",
-    respiratory: "呼吸道样本",
-    blood: "血液/无菌体液",
-    csf: "脑脊液",
-    stool: "肠道/粪便样本",
-    environment: "环境/水体样本",
+    clinical: I18N.t("stype.clinical"),
+    respiratory: I18N.t("stype.respiratory"),
+    blood: I18N.t("stype.blood"),
+    csf: I18N.t("stype.csf"),
+    stool: I18N.t("stype.stool"),
+    environment: I18N.t("stype.environment"),
   }[value] ?? value;
 }
 
@@ -1097,7 +1163,8 @@ function clamp(value, min, max) {
 }
 
 function formatInt(value) {
-  return new Intl.NumberFormat("zh-CN").format(value ?? 0);
+  const locale = I18N.lang === "zh" ? "zh-CN" : "en-US";
+  return new Intl.NumberFormat(locale).format(value ?? 0);
 }
 
 function formatPct(value) {
@@ -1147,3 +1214,15 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+// Language toggle
+document.getElementById("langToggle")?.addEventListener("click", () => {
+  I18N.toggleLang();
+  const btn = document.getElementById("langToggle");
+  if (btn) btn.textContent = I18N.t("lang.toggle");
+});
+
+// Re-render on language change
+window.addEventListener("langchange", () => {
+  render();
+});

@@ -3,18 +3,19 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>病原体条目 - Kraken2 病原体检测报告</title>
+    <title data-i18n="db.title">Pathogen Database - kraken2-pathogen-report</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header class="topbar">
       <div>
-        <p class="eyebrow">pathogen knowledge base</p>
-        <h1>病原体条目</h1>
+        <p class="eyebrow" data-i18n="db.eyebrow">pathogen knowledge base</p>
+        <h1 data-i18n="db.title">病原体条目</h1>
       </div>
-      <div class="section-actions">
-        <a class="action-btn secondary" href="docs.html">判读说明</a>
-        <a class="action-btn secondary" href="index.html">返回报告页</a>
+      <div class="topbar-right">
+        <button id="langToggle" class="lang-btn" type="button">EN</button>
+        <a class="action-btn secondary" href="docs.html" data-i18n="nav.docs">判读说明</a>
+        <a class="action-btn secondary" href="index.html" data-i18n="nav.back">返回报告页</a>
       </div>
     </header>
 
@@ -22,22 +23,22 @@
       <section class="panel">
         <div class="panel-head">
           <div>
-            <h2>条目管理</h2>
-            <span class="subnote">支持 CSV/JSON 上传合并；保存到本地后会自动参与主报告判读。</span>
+            <h2 data-i18n="db.management">条目管理</h2>
+            <span class="subnote" data-i18n="db.mgmtDesc">支持 CSV/JSON 上传合并</span>
           </div>
-          <span id="dbStatus" class="pill">加载中</span>
+          <span id="dbStatus" class="pill" data-i18n="db.loading">加载中</span>
         </div>
 
         <div class="db-toolbar">
-          <input id="dbSearch" type="search" placeholder="搜索中文名、英文名、taxid、疾病、传播途径" />
+          <input id="dbSearch" type="search" data-i18n-placeholder="db.searchPlaceholder" placeholder="搜索" />
           <label class="file-action">
-            上传 CSV/JSON
+            <span data-i18n="db.uploadBtn">上传 CSV/JSON</span>
             <input id="dbUpload" type="file" accept=".json,.csv,text/csv,application/json" />
           </label>
-          <button id="downloadJson" class="action-btn" type="button">下载 JSON</button>
-          <button id="downloadCsv" class="action-btn secondary" type="button">下载 CSV</button>
-          <button id="downloadTemplate" class="action-btn secondary" type="button">下载模板</button>
-          <button id="resetCustom" class="action-btn danger" type="button">清除本地修改</button>
+          <button id="downloadJson" class="action-btn" type="button" data-i18n="db.downloadJson">下载 JSON</button>
+          <button id="downloadCsv" class="action-btn secondary" type="button" data-i18n="db.downloadCsv">下载 CSV</button>
+          <button id="downloadTemplate" class="action-btn secondary" type="button" data-i18n="db.downloadTemplate">下载模板</button>
+          <button id="resetCustom" class="action-btn danger" type="button" data-i18n="db.resetCustom">清除本地修改</button>
         </div>
 
         <div id="dbSummary" class="summary-grid"></div>
@@ -45,17 +46,17 @@
 
       <section class="panel">
         <div class="panel-head">
-          <h2 id="editorTitle">新增/编辑条目</h2>
-          <button id="newEntry" class="action-btn secondary" type="button">新建空白条目</button>
+          <h2 id="editorTitle" data-i18n="db.editorTitle">新增/编辑条目</h2>
+          <button id="newEntry" class="action-btn secondary" type="button" data-i18n="db.newEntry">新建空白条目</button>
         </div>
         <form id="entryForm" class="entry-form">
-          <label>TaxID <input id="taxid" name="taxid" required /></label>
-          <label>中文名 <input id="zh" name="zh" /></label>
-          <label>英文名 <input id="englishName" name="englishName" /></label>
-          <label>NCBI 标准名 <input id="ncbiName" name="ncbiName" /></label>
-          <label>NCBI 分类等级
+          <label><span data-i18n="form.taxid">TaxID</span> <input id="taxid" name="taxid" required /></label>
+          <label><span data-i18n="form.zh">中文名</span> <input id="zh" name="zh" /></label>
+          <label><span data-i18n="form.englishName">英文名</span> <input id="englishName" name="englishName" /></label>
+          <label><span data-i18n="form.ncbiName">NCBI 标准名</span> <input id="ncbiName" name="ncbiName" /></label>
+          <label><span data-i18n="form.ncbiRank">NCBI 分类等级</span>
             <select id="ncbiRank" name="ncbiRank">
-              <option value="">未指定</option>
+              <option value="" data-i18n="form.rankUnspecified">未指定</option>
               <option value="species">species</option>
               <option value="subspecies">subspecies</option>
               <option value="isolate">isolate</option>
@@ -65,38 +66,38 @@
               <option value="species group">species group</option>
             </select>
           </label>
-          <label>类型
+          <label><span data-i18n="form.type">类型</span>
             <select id="type" name="type">
-              <option value="细菌">细菌</option>
-              <option value="病毒">病毒</option>
-              <option value="真菌">真菌</option>
+              <option value="细菌" data-i18n="db.bacteria">细菌</option>
+              <option value="病毒" data-i18n="db.virus">病毒</option>
+              <option value="真菌" data-i18n="db.fungus">真菌</option>
               <option value="寄生虫/原虫">寄生虫/原虫</option>
               <option value="寄生虫/蠕虫">寄生虫/蠕虫</option>
               <option value="待分类">待分类</option>
             </select>
           </label>
-          <label>风险等级
+          <label><span data-i18n="form.severity">风险等级</span>
             <select id="severity" name="severity">
-              <option value="high">high (第一/二类)</option>
-              <option value="medium">medium (第三类)</option>
-              <option value="low">low (第四类)</option>
+              <option value="high">high</option>
+              <option value="medium">medium</option>
+              <option value="low">low</option>
             </select>
           </label>
-          <label>危害程度 <input id="hazardClass" name="hazardClass" placeholder="第一类/第二类/第三类/第四类" /></label>
-          <label>匹配层级
+          <label><span data-i18n="form.hazardClass">危害程度</span> <input id="hazardClass" name="hazardClass" /></label>
+          <label><span data-i18n="form.matchRank">匹配层级</span>
             <select id="matchRank" name="matchRank">
-              <option value="exact">exact (精准匹配)</option>
-              <option value="clade">clade (属/科级全分支)</option>
+              <option value="exact">exact</option>
+              <option value="clade">clade</option>
             </select>
           </label>
-          <label>BSL <input id="biosafetyLevel" name="biosafetyLevel" /></label>
-          <label>症候群 <input id="syndrome" name="syndrome" /></label>
-          <label>疾病名称 <input id="disease" name="disease" /></label>
-          <label>传播途径 <input id="transmission" name="transmission" /></label>
-          <label>样本采集 <input id="sample" name="sample" /></label>
-          <label class="span-2">备注 <textarea id="note" name="note" rows="3"></textarea></label>
+          <label><span data-i18n="form.bsl">BSL</span> <input id="biosafetyLevel" name="biosafetyLevel" /></label>
+          <label><span data-i18n="form.syndrome">症候群</span> <input id="syndrome" name="syndrome" /></label>
+          <label><span data-i18n="form.disease">疾病名称</span> <input id="disease" name="disease" /></label>
+          <label><span data-i18n="form.transmission">传播途径</span> <input id="transmission" name="transmission" /></label>
+          <label><span data-i18n="form.sample">样本采集</span> <input id="sample" name="sample" /></label>
+          <label class="span-2"><span data-i18n="form.note">备注</span> <textarea id="note" name="note" rows="3"></textarea></label>
           <div class="form-actions span-2">
-            <button class="action-btn" type="submit">保存到本地判读库</button>
+            <button class="action-btn" type="submit" data-i18n="db.saveBtn">保存到本地判读库</button>
             <span id="formMessage" class="subnote"></span>
           </div>
         </form>
@@ -104,25 +105,13 @@
 
       <section class="panel">
         <div class="panel-head">
-          <h2>条目列表</h2>
-          <span id="visibleCount" class="pill">0 项</span>
+          <h2 data-i18n="db.entryList">条目列表</h2>
+          <span id="visibleCount" class="pill">0</span>
         </div>
         <div class="table-wrap docs-table-wrap">
           <table>
             <thead>
-              <tr>
-                <th>操作</th>
-                <th>来源</th>
-                <th>中文名</th>
-                <th>NCBI 标准名</th>
-                <th>TaxID</th>
-                <th>分类等级</th>
-                <th>匹配层级</th>
-                <th>类型</th>
-                <th>风险</th>
-                <th>疾病/症候群</th>
-                <th>传播/样本</th>
-              </tr>
+              <tr id="dbTableHead"></tr>
             </thead>
             <tbody id="dbTable"></tbody>
           </table>
@@ -131,10 +120,11 @@
     </main>
 
     <footer class="footer">
-      <p>上传说明：JSON 支持当前页面下载的数组格式；CSV 推荐使用"下载模板"生成的表头。静态网页不能直接改写 `pathogen-db.js`，本页修改会保存在当前浏览器本地。</p>
-      <p class="copyright">&copy; 版权所有，由 ldl 开发 · Kraken2 病原体检测报告网页</p>
+      <p data-i18n="db.uploadNotice">上传说明</p>
+      <p class="copyright" data-i18n="footer.copyright">© 版权所有</p>
     </footer>
 
+    <script src="i18n.js"></script>
     <script src="pathogen-db.js"></script>
     <script src="database.js"></script>
   </body>

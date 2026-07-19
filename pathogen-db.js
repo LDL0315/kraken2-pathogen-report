@@ -1,10 +1,13 @@
 // Generated from 人间传染病名录_TaxID-kraken2.xlsx. Do not edit by hand.
-// Total entries: 500, clade-level (genus/family): 112, exact-level (species/subspecies/isolate): 388
+// Total entries: 502, clade-level (genus/family): 113, exact-level: 389
+// Quarantine diseases (检疫传染病): 11 TaxIDs, Monitoring diseases (监测传染病): 30 TaxIDs
 window.SHENZHEN_PATHOGEN_META = {
   "sourceFile": "人间传染病名录_TaxID-kraken2.xlsx",
-  "totalRows": 501,
-  "validTaxids": 500,
-  "cladeLevelTaxids": 112,
+  "totalRows": 503,
+  "validTaxids": 502,
+  "cladeLevelTaxids": 113,
+  "quarantineTaxids": 11,
+  "monitoringTaxids": 30,
   "generatedFrom": "人间传染病名录_TaxID-kraken2.xlsx"
 };
 
@@ -15,14 +18,27 @@ window.PATHOGEN_CLADE_TAXIDS = new Set([
   "1016", "1033", "1301", "1647", "1654", "1763", "3110", "4830", "4838", "4842",
   "4852", "4855", "4859", "5036", "5149", "5159", "5305", "5333", "5455", "5475",
   "5498", "5502", "5506", "5533", "5538", "5550", "5552", "5579", "5581", "5583",
-  "5587", "5598", "5600", "10358", "10911", "10912", "11019", "11040", "11646", "12059",
-  "12103", "13474", "13705", "29521", "29907", "34392", "34487", "36629", "36910", "36922",
-  "37463", "37940", "38946", "40354", "40374", "40411", "41687", "43987", "55170", "55193",
-  "59585", "59732", "65412", "66225", "79213", "81097", "82105", "83822", "90268", "95341",
-  "100815", "101102", "112177", "114230", "114277", "117563", "138954", "142786", "151340", "159075",
-  "160029", "162387", "194960", "229219", "241727", "249588", "284134", "308472", "364772", "389487",
-  "413496", "461281", "688353", "694013", "1001993", "1494215", "1503932", "1507401", "1838142", "1980442",
-  "2810619", "3044782"
+  "5587", "5598", "5600", "5855", "10358", "10911", "10912", "11019", "11040", "11646",
+  "12059", "12103", "13474", "13705", "29521", "29907", "34392", "34487", "36629", "36910",
+  "36922", "37463", "37940", "38946", "40354", "40374", "40411", "41687", "43987", "55170",
+  "55193", "59585", "59732", "65412", "66225", "79213", "81097", "82105", "83822", "90268",
+  "95341", "100815", "101102", "112177", "114230", "114277", "117563", "138954", "142786", "151340",
+  "159075", "160029", "162387", "194960", "229219", "241727", "249588", "284134", "308472", "364772",
+  "389487", "413496", "461281", "688353", "694013", "1001993", "1494215", "1503932", "1507401", "1838142",
+  "1980442", "2810619", "3044782"
+]);
+
+// 检疫传染病 TaxIDs (国境卫生检疫法 2025): any hit forces highest priority
+window.QUARANTINE_TAXIDS = new Set([
+  "632", "666", "1392", "10255", "11089", "138950", "1335626", "1570291", "2901879", "3052310",
+  "3052505"
+]);
+
+// 监测传染病 TaxIDs (国境卫生检疫法 2025): any hit forces highest priority
+window.MONITORING_TAXIDS = new Set([
+  "487", "520", "562", "621", "622", "623", "624", "670", "1717", "1773",
+  "5759", "5855", "10244", "11072", "11082", "11234", "11309", "11588", "12637", "12721",
+  "28901", "37124", "54736", "64320", "118655", "142786", "1980442", "2697049", "3052225", "3052518"
 ]);
 
 window.SHENZHEN_PATHOGENS = [
@@ -277,6 +293,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "流行性脑脊髓膜炎",
   },
   {
     "taxid": "504",
@@ -325,6 +343,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "百日咳",
   },
   {
     "taxid": "535",
@@ -421,6 +441,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "肠出血性大肠杆菌感染性腹泻",
   },
   {
     "taxid": "571",
@@ -529,6 +551,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "细菌性和阿米巴性痢疾",
   },
   {
     "taxid": "622",
@@ -541,6 +565,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "细菌性和阿米巴性痢疾",
   },
   {
     "taxid": "623",
@@ -553,6 +579,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "细菌性和阿米巴性痢疾",
   },
   {
     "taxid": "624",
@@ -565,6 +593,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "细菌性和阿米巴性痢疾",
   },
   {
     "taxid": "630",
@@ -589,6 +619,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：species级精准匹配",
+    "quarantineList": "quarantine",
+    "quarantineDisease": "鼠疫",
   },
   {
     "taxid": "633",
@@ -685,6 +717,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：species级精准匹配",
+    "quarantineList": "quarantine",
+    "quarantineDisease": "霍乱",
   },
   {
     "taxid": "670",
@@ -697,6 +731,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "副溶血弧菌感染性腹泻",
   },
   {
     "taxid": "672",
@@ -1081,6 +1117,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：species级精准匹配",
+    "quarantineList": "quarantine",
+    "quarantineDisease": "肺炭疽",
   },
   {
     "taxid": "1396",
@@ -1297,6 +1335,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "白喉",
   },
   {
     "taxid": "1719",
@@ -1417,6 +1457,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "肺结核",
   },
   {
     "taxid": "1773",
@@ -1429,6 +1471,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "肺结核",
   },
   {
     "taxid": "1780",
@@ -2233,6 +2277,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第一类",
     "matchRank": "exact",
     "note": "危害程度：第一类；匹配层级：isolate级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "猴痘",
   },
   {
     "taxid": "10245",
@@ -2257,6 +2303,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第一类",
     "matchRank": "exact",
     "note": "危害程度：第一类；匹配层级：isolate级精准匹配",
+    "quarantineList": "quarantine",
+    "quarantineDisease": "天花",
   },
   {
     "taxid": "10258",
@@ -2557,6 +2605,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：isolate级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "流行性乙型脑炎",
   },
   {
     "taxid": "11077",
@@ -2605,6 +2655,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：isolate级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "西尼罗热",
   },
   {
     "taxid": "11083",
@@ -2689,6 +2741,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第一类",
     "matchRank": "exact",
     "note": "危害程度：第一类；匹配层级：isolate级精准匹配",
+    "quarantineList": "quarantine",
+    "quarantineDisease": "黄热病",
   },
   {
     "taxid": "11089",
@@ -2701,6 +2755,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：isolate级精准匹配",
+    "quarantineList": "quarantine",
+    "quarantineDisease": "黄热病",
   },
   {
     "taxid": "11092",
@@ -2737,6 +2793,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：isolate级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "麻疹",
   },
   {
     "taxid": "11276",
@@ -2785,6 +2843,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "人感染新亚型流感",
   },
   {
     "taxid": "11309",
@@ -2797,6 +2857,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "人感染新亚型流感",
   },
   {
     "taxid": "11309",
@@ -2809,6 +2871,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "人感染新亚型流感",
   },
   {
     "taxid": "11318",
@@ -2857,6 +2921,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：isolate级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "裂谷热",
   },
   {
     "taxid": "11596",
@@ -3025,6 +3091,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：isolate级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "登革热",
   },
   {
     "taxid": "12721",
@@ -3037,6 +3105,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "艾滋病",
   },
   {
     "taxid": "12814",
@@ -3157,6 +3227,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "伤寒和副伤寒",
   },
   {
     "taxid": "29322",
@@ -3565,6 +3637,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：isolate级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "基孔肯雅热",
   },
   {
     "taxid": "37296",
@@ -4033,6 +4107,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "伤寒和副伤寒",
   },
   {
     "taxid": "55170",
@@ -4261,6 +4337,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：isolate级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "寨卡病毒病",
   },
   {
     "taxid": "64495",
@@ -4753,6 +4831,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：isolate级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "奥罗普切病毒病",
   },
   {
     "taxid": "121759",
@@ -4813,6 +4893,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：isolate级精准匹配",
+    "quarantineList": "quarantine",
+    "quarantineDisease": "脊髓灰质炎",
   },
   {
     "taxid": "138954",
@@ -4837,6 +4919,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "clade",
     "note": "危害程度：第三类；匹配层级：属级以上全分支",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "诺如病毒急性胃肠炎",
   },
   {
     "taxid": "145392",
@@ -5425,6 +5509,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：isolate级精准匹配",
+    "quarantineList": "quarantine",
+    "quarantineDisease": "中东呼吸综合征",
   },
   {
     "taxid": "1405807",
@@ -5581,6 +5667,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第一类",
     "matchRank": "exact",
     "note": "危害程度：第一类；匹配层级：isolate级精准匹配",
+    "quarantineList": "quarantine",
+    "quarantineDisease": "埃博拉病毒病",
   },
   {
     "taxid": "1620892",
@@ -5653,6 +5741,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "clade",
     "note": "危害程度：第二类；匹配层级：属级以上全分支",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "流行性出血热",
   },
   {
     "taxid": "1980442",
@@ -5665,6 +5755,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "clade",
     "note": "危害程度：第二类；匹配层级：属级以上全分支",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "流行性出血热",
   },
   {
     "taxid": "2083198",
@@ -5737,6 +5829,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：isolate级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "新型冠状病毒感染",
   },
   {
     "taxid": "2748208",
@@ -5785,6 +5879,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第二类",
     "matchRank": "exact",
     "note": "危害程度：第二类；匹配层级：isolate级精准匹配",
+    "quarantineList": "quarantine",
+    "quarantineDisease": "传染性非典型肺炎",
   },
   {
     "taxid": "2907957",
@@ -5845,6 +5941,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第一类",
     "matchRank": "exact",
     "note": "危害程度：第一类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "尼帕病毒病",
   },
   {
     "taxid": "3052230",
@@ -5917,6 +6015,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第一类",
     "matchRank": "exact",
     "note": "危害程度：第一类；匹配层级：species级精准匹配",
+    "quarantineList": "quarantine",
+    "quarantineDisease": "拉沙热",
   },
   {
     "taxid": "3052317",
@@ -5977,6 +6077,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第一类",
     "matchRank": "exact",
     "note": "危害程度：第一类；匹配层级：species级精准匹配",
+    "quarantineList": "quarantine",
+    "quarantineDisease": "马尔堡病毒病",
   },
   {
     "taxid": "3052518",
@@ -5989,6 +6091,8 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第一类",
     "matchRank": "exact",
     "note": "危害程度：第一类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "克里米亚-刚果出血热",
   },
   {
     "taxid": "3052533",
@@ -6025,5 +6129,33 @@ window.SHENZHEN_PATHOGENS = [
     "hazardClass": "第三类",
     "matchRank": "exact",
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
+  },
+  {
+    "taxid": "5855",
+    "zh": "疟原虫属",
+    "englishName": "Plasmodium spp.",
+    "ncbiName": "Plasmodium",
+    "ncbiRank": "genus",
+    "type": "寄生虫/原虫",
+    "severity": "high",
+    "hazardClass": "第三类",
+    "matchRank": "clade",
+    "note": "危害程度：第三类；匹配层级：属级以上全分支",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "疟疾",
+  },
+  {
+    "taxid": "5759",
+    "zh": "溶组织内阿米巴",
+    "englishName": "Entamoeba histolytica",
+    "ncbiName": "Entamoeba histolytica",
+    "ncbiRank": "species",
+    "type": "寄生虫/原虫",
+    "severity": "high",
+    "hazardClass": "第三类",
+    "matchRank": "exact",
+    "note": "危害程度：第三类；匹配层级：species级精准匹配",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "细菌性和阿米巴性痢疾",
   },
 ];
