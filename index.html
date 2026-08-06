@@ -183,10 +183,20 @@
             </div>
             <div id="sampleOverview" class="sample-overview"></div>
           </section>
+          <section class="panel wide" id="matrixFilterPanel" style="display:none">
+            <div class="panel-head">
+              <h3 data-i18n="multi.filterTitle">选择比较的病原体</h3>
+              <button id="matrixFilterAll" class="action-btn secondary" type="button" data-i18n="multi.selectAll">全选</button>
+              <button id="matrixFilterNone" class="action-btn secondary" type="button" data-i18n="multi.deselectAll">取消全选</button>
+              <span id="matrixFilterCount" class="pill"></span>
+            </div>
+            <div id="matrixFilterTags" class="matrix-filter-tags"></div>
+          </section>
           <section class="panel wide">
             <div class="panel-head">
               <h3 data-i18n="multi.matrix">病原体检出矩阵</h3>
               <span id="matrixMetric" class="pill"></span>
+              <button id="matrixToggle" class="action-btn secondary" type="button" data-i18n="multi.compactView">紧凑视图</button>
             </div>
             <div id="matrix" class="matrix"></div>
           </section>

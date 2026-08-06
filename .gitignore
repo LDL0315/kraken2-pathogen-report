@@ -30,3 +30,6 @@ node_modules/
 
 # Excel source files (generated JS is tracked instead)
 *.xlsx
+
+# Test data (large local datasets & analysis outputs)
+testdata/

@@ -89,6 +89,9 @@ const state = {
   hideBackground: true,
   treeQuery: "",
   sampleType: "clinical",
+  matrixCompact: true,
+  matrixSelectedTaxids: null, // null = all selected; Set<string> = filtered
+  matrixAllTaxa: [],          // cached full taxa list
 };
 
 const els = {
@@ -118,6 +121,12 @@ const els = {
   sampleOverview: document.querySelector("#sampleOverview"),
   matrix: document.querySelector("#matrix"),
   matrixMetric: document.querySelector("#matrixMetric"),
+  matrixToggle: document.querySelector("#matrixToggle"),
+  matrixFilterPanel: document.querySelector("#matrixFilterPanel"),
+  matrixFilterAll: document.querySelector("#matrixFilterAll"),
+  matrixFilterNone: document.querySelector("#matrixFilterNone"),
+  matrixFilterCount: document.querySelector("#matrixFilterCount"),
+  matrixFilterTags: document.querySelector("#matrixFilterTags"),
 };
 
 const helpTooltip = document.createElement("div");
@@ -241,6 +250,23 @@ els.exportMatrixCsv.addEventListener("click", () => {
   downloadText(`kraken2-pathogen-matrix-${dateStamp()}.csv`, buildMatrixCsv(), "text/csv;charset=utf-8");
 });
 
+els.matrixToggle.addEventListener("click", () => {
+  state.matrixCompact = !state.matrixCompact;
+  els.matrixToggle.textContent = I18N.t(state.matrixCompact ? "multi.detailedView" : "multi.compactView");
+  els.matrixToggle.setAttribute("data-i18n", state.matrixCompact ? "multi.detailedView" : "multi.compactView");
+  renderMatrix();
+});
+
+els.matrixFilterAll.addEventListener("click", () => {
+  state.matrixSelectedTaxids = null;
+  renderMulti();
+});
+
+els.matrixFilterNone.addEventListener("click", () => {
+  state.matrixSelectedTaxids = new Set();
+  renderMulti();
+});
+
 async function loadFiles(files) {
   const reportFiles = files.filter((file) => file.size > 0);
   if (!reportFiles.length) return;
@@ -254,6 +280,8 @@ async function loadFiles(files) {
 
   state.samples = parsed;
   state.selectedSample = 0;
+  state.matrixSelectedTaxids = null;
+  state.matrixAllTaxa = [];
   annotateSamples();
   render();
 }
@@ -670,7 +698,10 @@ function renderTree() {
 function renderMulti() {
   els.multiSampleCount.textContent = `${state.samples.length} ${I18N.t("count.samples")}`;
   els.matrixMetric.textContent = metricLabel(state.metric);
+  els.matrixToggle.textContent = I18N.t(state.matrixCompact ? "multi.detailedView" : "multi.compactView");
+  els.matrixToggle.setAttribute("data-i18n", state.matrixCompact ? "multi.detailedView" : "multi.compactView");
   renderSampleOverview();
+  renderMatrixFilter();
   renderMatrix();
 }
 
@@ -695,15 +726,88 @@ function renderSampleOverview() {
     .join("");
 }
 
+function renderMatrixFilter() {
+  // Cache full taxa list first
+  collectMatrixTaxa();
+  const allTaxa = state.matrixAllTaxa;
+
+  if (!allTaxa.length) {
+    els.matrixFilterPanel.style.display = "none";
+    return;
+  }
+
+  els.matrixFilterPanel.style.display = "";
+
+  const selected = state.matrixSelectedTaxids;
+  const selCount = selected === null ? allTaxa.length : selected.size;
+
+  els.matrixFilterCount.textContent = I18N.t("multi.filterCount", { n: selCount, total: allTaxa.length });
+
+  let html = `<p class="filter-tip">${escapeHtml(I18N.t("multi.filterTip"))}</p>`;
+  html += `<div class="filter-tags-grid">`;
+
+  allTaxa.forEach((taxon) => {
+    const isActive = selected === null || selected.has(taxon.taxid);
+    const klass = ["filter-tag"];
+    const statKlass = ["tag-status"];
+    if (isActive) klass.push("active");
+    if (taxon.status === "critical") statKlass.push("status-critical");
+    else if (taxon.status === "review") statKlass.push("status-review");
+    else if (taxon.status === "trace") statKlass.push("status-trace");
+
+    html += `<button class="${klass.join(" ")}" data-taxid="${escapeHtml(taxon.taxid)}" type="button">
+      <span class="tag-status-dot ${statKlass.join(" ")}"></span>
+      ${escapeHtml(taxon.name)}
+      ${taxon.type ? `<span class="tag-type">${escapeHtml(taxon.type)}</span>` : ""}
+    </button>`;
+  });
+
+  html += `</div>`;
+  els.matrixFilterTags.innerHTML = html;
+
+  // Delegate click events on tags
+  els.matrixFilterTags.querySelectorAll(".filter-tag").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const taxid = btn.dataset.taxid;
+      if (!taxid) return;
+
+      // Initialize selected set from full list if null
+      if (state.matrixSelectedTaxids === null) {
+        state.matrixSelectedTaxids = new Set(allTaxa.map((t) => t.taxid));
+      }
+
+      if (state.matrixSelectedTaxids.has(taxid)) {
+        state.matrixSelectedTaxids.delete(taxid);
+      } else {
+        state.matrixSelectedTaxids.add(taxid);
+      }
+
+      // If all selected again, revert to null
+      if (state.matrixSelectedTaxids.size === allTaxa.length) {
+        state.matrixSelectedTaxids = null;
+      }
+
+      renderMulti();
+    });
+  });
+}
+
 function renderMatrix() {
   const taxa = collectMatrixTaxa();
   if (!taxa.length) {
     els.matrix.innerHTML = `<p class="subnote" style="padding:14px">${escapeHtml(I18N.t("table.noMatrix"))}</p>`;
     return;
   }
+  if (state.matrixCompact) {
+    renderMatrixCompact(taxa);
+  } else {
+    renderMatrixDetailed(taxa);
+  }
+}
 
+function renderMatrixDetailed(taxa) {
   const columns = state.samples.length + 1;
-  const template = `minmax(220px, 280px) repeat(${state.samples.length}, minmax(120px, 1fr))`;
+  const template = `minmax(280px, 420px) repeat(${state.samples.length}, minmax(120px, 1fr))`;
   let html = `<div class="matrix-grid" style="grid-template-columns:${template}">`;
   html += `<div class="matrix-head">${escapeHtml(I18N.t("th.pathogen"))}</div>`;
   html += state.samples.map((sample) => `<div class="matrix-head">${escapeHtml(shortName(sample.fileName))}</div>`).join("");
@@ -711,7 +815,8 @@ function renderMatrix() {
   taxa.forEach((taxon) => {
     html += `<div class="matrix-taxon">${escapeHtml(taxon.name)}<span class="subnote">taxid ${escapeHtml(taxon.taxid)}</span></div>`;
     state.samples.forEach((sample) => {
-      const hit = sample.pathogenHits.find((item) => item.row.taxid === taxon.taxid);
+      const rawHit = sample.pathogenHits.find((item) => item.row.taxid === taxon.taxid);
+      const hit = rawHit && rawHit.row.directReads >= state.minDirect ? rawHit : null;
       const value = hit ? metricValue(hit) : 0;
       const intensity = state.metric === "score" ? value : normalizeMetric(value, taxon.taxid);
       html += `<div class="matrix-cell" style="${matrixCellStyle(intensity, hit)}">${hit ? formatMetric(value) : "-"}</div>`;
@@ -719,6 +824,58 @@ function renderMatrix() {
   });
 
   html += `</div>`;
+  els.matrix.innerHTML = html;
+}
+
+function renderMatrixCompact(taxa) {
+  const nameWidth = 220;
+  const colWidth = 50;
+  const template = `${nameWidth}px repeat(${state.samples.length}, ${colWidth}px)`;
+  let html = `<div class="matrix-compact-grid" style="grid-template-columns:${template}">`;
+
+  // Header row
+  html += `<div class="matrix-compact-corner">${escapeHtml(I18N.t("th.pathogen"))}</div>`;
+  state.samples.forEach((sample, i) => {
+    html += `<div class="matrix-compact-head" title="${escapeHtml(sample.fileName)}">S${i + 1}</div>`;
+  });
+
+  // Data rows
+  taxa.forEach((taxon) => {
+    html += `<div class="matrix-compact-taxon" title="${escapeHtml(taxon.name)}">${escapeHtml(taxon.name)}</div>`;
+    state.samples.forEach((sample, i) => {
+      const rawHit = sample.pathogenHits.find((item) => item.row.taxid === taxon.taxid);
+      const hit = rawHit && rawHit.row.directReads >= state.minDirect ? rawHit : null;
+      const value = hit ? metricValue(hit) : 0;
+      const intensity = state.metric === "score" ? value : normalizeMetric(value, taxon.taxid);
+      const displayVal = hit ? formatMetric(value) : "";
+      const tip = `${escapeHtml(taxon.name)} \u2192 S${i + 1}: ${displayVal || "-"}`;
+      html += `<div class="matrix-compact-cell" style="${matrixCellStyle(intensity, hit)}" title="${tip}">${displayVal}</div>`;
+    });
+  });
+
+  html += `</div>`;
+
+  // Sample legend
+  html += `<div class="matrix-legend">`;
+  html += `<div class="matrix-legend-title">${escapeHtml(I18N.t("multi.sampleLegend"))}</div>`;
+  html += `<div class="matrix-legend-grid">`;
+  state.samples.forEach((sample, i) => {
+    html += `<div class="matrix-legend-item"><span class="matrix-legend-label">S${i + 1}</span><span class="matrix-legend-name" title="${escapeHtml(sample.fileName)}">${escapeHtml(shortName(sample.fileName))}</span></div>`;
+  });
+  html += `</div></div>`;
+
+  // Color legend
+  html += `<div class="matrix-color-legend">`;
+  html += `<span class="mcl-label">${escapeHtml(I18N.t("multi.colorLegend"))}</span>`;
+  html += `<span class="mcl-bar mcl-critical"></span><span class="mcl-text">${escapeHtml(I18N.t("summary.critical"))}</span>`;
+  html += `<span class="mcl-bar mcl-review"></span><span class="mcl-text">${escapeHtml(I18N.t("summary.review"))}</span>`;
+  html += `<span class="mcl-bar mcl-trace"></span><span class="mcl-text">${escapeHtml(I18N.t("summary.trace"))}</span>`;
+  html += `<span class="mcl-bar mcl-background"></span><span class="mcl-text">${escapeHtml(I18N.t("status.background"))}</span>`;
+  html += `<span class="mcl-gradient"></span>`;
+  html += `<span class="mcl-text">${escapeHtml(I18N.t("multi.lowIntensity"))}</span>`;
+  html += `<span class="mcl-text">${escapeHtml(I18N.t("multi.highIntensity"))}</span>`;
+  html += `</div>`;
+
   els.matrix.innerHTML = html;
 }
 
@@ -811,6 +968,10 @@ function buildMultiReportHtml() {
     })
     .join("");
 
+  const sampleLegendRows = state.samples
+    .map((sample, i) => `<tr><td>S${i + 1}</td><td>${escapeHtml(sample.fileName)}</td></tr>`)
+    .join("");
+
   return reportDocument(
     I18N.t("report.multiTitle"),
     `
@@ -839,14 +1000,27 @@ function buildMultiReportHtml() {
       </section>
       <section>
         <h2>${escapeHtml(I18N.t("multi.matrix"))}</h2>
-        <table>
+        <p style="font-size:12px;color:#66736f;margin:0 0 8px">${escapeHtml(I18N.t("multi.colorLegend"))}\uFF1A
+          <span style="display:inline-block;width:14px;height:10px;border-radius:2px;background:rgba(180,59,59,0.7);vertical-align:middle"></span> ${escapeHtml(I18N.t("summary.critical"))}
+          <span style="display:inline-block;width:14px;height:10px;border-radius:2px;background:rgba(168,102,18,0.6);vertical-align:middle;margin-left:6px"></span> ${escapeHtml(I18N.t("summary.review"))}
+          <span style="display:inline-block;width:14px;height:10px;border-radius:2px;background:rgba(49,110,168,0.5);vertical-align:middle;margin-left:6px"></span> ${escapeHtml(I18N.t("summary.trace"))}
+          <span style="display:inline-block;width:14px;height:10px;border-radius:2px;background:rgba(102,115,111,0.3);vertical-align:middle;margin-left:6px"></span> ${escapeHtml(I18N.t("status.background"))}
+        </p>
+        <table class="matrix-table">
           <thead>
             <tr>
               <th>${escapeHtml(I18N.t("th.pathogen"))}</th>
-              ${state.samples.map((sample) => `<th>${escapeHtml(shortName(sample.fileName))}</th>`).join("")}
+              ${state.samples.map((_, i) => `<th class="matrix-th-s">S${i + 1}</th>`).join("")}
             </tr>
           </thead>
           <tbody>${matrixRows}</tbody>
+        </table>
+      </section>
+      <section>
+        <h2>${escapeHtml(I18N.t("multi.sampleLegend"))}</h2>
+        <table class="legend-table">
+          <thead><tr><th>#</th><th>${escapeHtml(I18N.t("report.sample"))}</th></tr></thead>
+          <tbody>${sampleLegendRows}</tbody>
         </table>
       </section>
       <section>
@@ -854,15 +1028,15 @@ function buildMultiReportHtml() {
         <p class="method-text">${escapeHtml(I18N.t("method.text"))}</p>
         <h3>${escapeHtml(I18N.t("report.colDefs"))}</h3>
         <div class="col-def">
-        <p><strong>${escapeHtml(I18N.t("th.status"))}</strong>：${escapeHtml(I18N.t("col.status"))}</p>
-        <p><strong>${escapeHtml(I18N.t("th.pathogen"))}</strong>：${escapeHtml(I18N.t("col.pathogen"))}</p>
-        <p><strong>${escapeHtml(I18N.t("th.taxid"))}</strong>：${escapeHtml(I18N.t("col.taxid"))}</p>
-        <p><strong>${escapeHtml(I18N.t("th.type"))}</strong>：${escapeHtml(I18N.t("col.type"))}</p>
-        <p><strong>${escapeHtml(I18N.t("th.score"))}</strong>：${escapeHtml(I18N.t("col.score"))}</p>
-        <p><strong>${escapeHtml(I18N.t("th.cladePct"))}</strong>：${escapeHtml(I18N.t("col.cladePct"))}</p>
-        <p><strong>${escapeHtml(I18N.t("th.cladeReads"))}</strong>：${escapeHtml(I18N.t("col.cladeReads"))}</p>
-        <p><strong>${escapeHtml(I18N.t("th.directReads"))}</strong>：${escapeHtml(I18N.t("col.directReads"))}</p>
-        <p><strong>${escapeHtml(I18N.t("th.minimizers"))}</strong>：${escapeHtml(I18N.t("col.minimizers"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.status"))}</strong>\uFF1A${escapeHtml(I18N.t("col.status"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.pathogen"))}</strong>\uFF1A${escapeHtml(I18N.t("col.pathogen"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.taxid"))}</strong>\uFF1A${escapeHtml(I18N.t("col.taxid"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.type"))}</strong>\uFF1A${escapeHtml(I18N.t("col.type"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.score"))}</strong>\uFF1A${escapeHtml(I18N.t("col.score"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.cladePct"))}</strong>\uFF1A${escapeHtml(I18N.t("col.cladePct"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.cladeReads"))}</strong>\uFF1A${escapeHtml(I18N.t("col.cladeReads"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.directReads"))}</strong>\uFF1A${escapeHtml(I18N.t("col.directReads"))}</p>
+        <p><strong>${escapeHtml(I18N.t("th.minimizers"))}</strong>\uFF1A${escapeHtml(I18N.t("col.minimizers"))}</p>
         </div>
       </section>
       <section>
@@ -884,7 +1058,8 @@ function buildMatrixCsv() {
   const rows = taxa.map((taxon) => {
     const row = [taxon.taxid, taxon.name, metricLabel(state.metric)];
     state.samples.forEach((sample) => {
-      const hit = sample.pathogenHits.find((item) => item.row.taxid === taxon.taxid);
+      const rawHit = sample.pathogenHits.find((item) => item.row.taxid === taxon.taxid);
+      const hit = rawHit && rawHit.row.directReads >= state.minDirect ? rawHit : null;
       row.push(
         hit ? hit.status.label : "",
         hit ? rawMetricValue(hit) : "",
@@ -924,12 +1099,22 @@ function reportHitRow(hit) {
 function reportMatrixRow(taxon) {
   return `
     <tr>
-      <td><strong>${escapeHtml(taxon.name)}</strong><span>taxid ${escapeHtml(taxon.taxid)}</span></td>
+      <td class="matrix-td-name"><strong>${escapeHtml(taxon.name)}</strong><span>taxid ${escapeHtml(taxon.taxid)}</span></td>
       ${state.samples
         .map((sample) => {
-          const hit = sample.pathogenHits.find((item) => item.row.taxid === taxon.taxid);
-          if (!hit) return `<td class="empty">-</td>`;
-          return `<td><span class="badge ${hit.status.key}">${hit.status.label}</span><span>${formatMetric(metricValue(hit))}</span></td>`;
+          const rawHit = sample.pathogenHits.find((item) => item.row.taxid === taxon.taxid);
+          const hit = rawHit && rawHit.row.directReads >= state.minDirect ? rawHit : null;
+          if (!hit) return `<td class="matrix-td-empty">-</td>`;
+          const value = metricValue(hit);
+          const intensity = state.metric === "score" ? value : normalizeMetric(value, taxon.taxid);
+          const alpha = clamp(intensity, 8, 100) / 100;
+          const colors = {
+            critical: `rgba(180, 59, 59, ${0.18 + alpha * 0.55})`,
+            review: `rgba(168, 102, 18, ${0.18 + alpha * 0.50})`,
+            trace: `rgba(49, 110, 168, ${0.14 + alpha * 0.46})`,
+            background: `rgba(102, 115, 111, ${0.10 + alpha * 0.30})`,
+          };
+          return `<td class="matrix-td-cell" style="background:${colors[hit.status.key]};">${formatMetric(value)}</td>`;
         })
         .join("")}
     </tr>
@@ -1009,7 +1194,16 @@ function reportCss() {
     .hero{background:#152622;color:#f8fbfa}.hero p{color:#dce8e4;max-width:920px}.eyebrow{margin:0 0 6px;color:#7aa696;font-size:12px;font-weight:800;text-transform:uppercase}.hero h1{margin:0;font-size:34px}
     h2{margin:0 0 12px;font-size:20px}h3{margin:0 0 6px;font-size:15px}.summary,.settings,.definitions{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}.summary div,.settings div,.definitions div,.criteria div,.db-report-group{border:1px solid #d9e0dd;border-radius:8px;padding:12px;background:#fbfcfc}.summary span,.settings strong,.definitions strong{display:block;color:#66736f;font-size:12px}.summary strong{display:block;margin-top:6px;font-size:28px}.summary em,.settings span,.definitions span{display:block;margin-top:4px;color:#66736f;font-size:12px;font-style:normal}.criteria{display:grid;gap:8px;margin-bottom:12px}.criteria strong{color:#17201f}.db-report-group{margin-top:10px}.db-report-group p{margin:0;color:#66736f;font-size:13px;line-height:1.55}.method-text{font-size:14px;line-height:1.9;margin:0 0 1em;color:#333}.col-def p{margin:0.35em 0;font-size:14px;line-height:1.75;color:#444}
     .command-block{overflow:auto;margin:10px 0 16px;border:1px solid #d9e0dd;border-radius:8px;background:#152622;color:#f8fbfa;padding:14px;line-height:1.45}.command-block code{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;font-size:13px}
-    table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px;border-bottom:1px solid #d9e0dd;text-align:left;vertical-align:top}th{background:#f9fbfa;color:#56615e;font-size:12px}td span{display:block;color:#66736f;font-size:12px;margin-top:3px}.badge{display:inline-block;margin:0 4px 2px 0;padding:4px 8px;border-radius:999px;font-weight:800}.critical{background:#f3d7d7;color:#832626}.review{background:#f4e1c2;color:#754708}.trace{background:#d6e4f4;color:#224d75}.background{background:#e8eceb;color:#56615e}.quarantine-badge{background:#c0392b;color:#fff;border:1px solid #922b21}.monitoring-badge{background:#e67e22;color:#fff;border:1px solid #b9651b}.empty{color:#9aa5a1}.note,footer{color:#66736f;font-size:13px}footer{margin-top:18px}
+    table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px;border-bottom:1px solid #d9e0dd;text-align:left;vertical-align:top}th{background:#f9fbfa;color:#56615e;font-size:12px}td span{display:block;color:#66736f;font-size:12px;margin-top:3px}.badge{display:inline-block;margin:0 4px 2px 0;padding:4px 8px;border-radius:999px;font-weight:800}.critical{background:#f3d7d7;color:#832626}.review{background:#f4e1c2;color:#754708}.trace{background:#d6e4f4;color:#224d75}.background{background:#e8eceb;color:#56615e}.quarantine-badge{background:#c0392b;color:#fff;border:1px solid #922b21}.monitoring-badge{background:#e67e22;color:#fff;border:1px solid #b9651b}.empty{color:#9aa5a1}    .note,footer{color:#66736f;font-size:13px}footer{margin-top:18px}
+    .matrix-table{width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed}
+    .matrix-table th,.matrix-table td{padding:5px 6px;border:1px solid #e5ebe8;text-align:center;vertical-align:middle}
+    .matrix-table .matrix-th-s{width:48px;min-width:48px;max-width:48px;font-size:11px;text-align:center}
+    .matrix-table .matrix-td-name{text-align:left;font-size:11px;min-width:200px;word-break:break-word;line-height:1.4}
+    .matrix-table .matrix-td-empty{color:#bbb}
+    .matrix-table .matrix-td-cell{font-weight:800;font-variant-numeric:tabular-nums;font-size:10px}
+    .legend-table{width:auto;border-collapse:collapse;font-size:12px}
+    .legend-table th,.legend-table td{padding:5px 10px;border:1px solid #d9e0dd}
+    .legend-table th{background:#f9fbfa}
   `;
 }
 
@@ -1044,16 +1238,30 @@ function collectMatrixTaxa() {
       const existing = map.get(hit.row.taxid);
       const value = metricValue(hit);
       if (!existing) {
-        map.set(hit.row.taxid, { taxid: hit.row.taxid, name: displayName(hit), best: value, bestScore: hit.score });
+        map.set(hit.row.taxid, {
+          taxid: hit.row.taxid,
+          name: displayName(hit),
+          best: value,
+          bestScore: hit.score,
+          status: hit.status.key,
+          type: hit.db ? hit.db.type || "" : "",
+        });
       } else {
         existing.best = Math.max(existing.best, value);
         existing.bestScore = Math.max(existing.bestScore, hit.score);
       }
     });
   });
-  return [...map.values()]
-    .sort((a, b) => b.bestScore - a.bestScore || b.best - a.best)
-    .slice(0, Math.max(1, state.topN));
+  const full = [...map.values()].sort((a, b) => b.bestScore - a.bestScore || b.best - a.best);
+  state.matrixAllTaxa = full;
+
+  // Apply selection filter
+  const selected = state.matrixSelectedTaxids;
+  const filtered = selected === null
+    ? full.slice(0, Math.max(1, state.topN))
+    : full.filter((t) => selected.has(t.taxid)).slice(0, Math.max(1, state.topN));
+
+  return filtered;
 }
 
 function normalizeMetric(value, taxid) {
