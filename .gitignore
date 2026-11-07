@@ -33,3 +33,8 @@ node_modules/
 
 # Test data (large local datasets & analysis outputs)
 testdata/
+
+# Browser testing artifacts (playwright-cli)
+.playwright-cli/
+initial.yaml
+after_upload.yaml

@@ -42,13 +42,46 @@ const EXCLUSION_PATTERNS = [
 
 const CUSTOM_PATHOGEN_STORAGE_KEY = "kraken2-pathogen-custom-db-v1";
 const SHENZHEN_PATHOGENS = typeof window !== "undefined" && Array.isArray(window.SHENZHEN_PATHOGENS) ? window.SHENZHEN_PATHOGENS : [];
-SHENZHEN_PATHOGENS.forEach(applyPathogenRecord);
-readCustomPathogens().forEach(applyPathogenRecord);
+SHENZHEN_PATHOGENS.forEach((item) => applyPathogenRecord(item, false));
+readCustomPathogens().forEach((item) => applyPathogenRecord(item, true));
 
-function applyPathogenRecord(item) {
+function pathogenSeverityRank(severity) {
+  return severity === "high" ? 3 : severity === "medium" ? 2 : 1;
+}
+
+function pathogenQuarantineRank(list) {
+  return list === "quarantine" ? 3 : list === "monitoring" ? 2 : 0;
+}
+
+function mergePathogenRecords(a, b) {
+  // 同一 TaxID 多来源条目合并（修复重复 TaxID 覆盖丢失）：
+  // 1. 检疫/监测身份优先；2. severity 高者优先；
+  // 3. 评分相同时用户自定义库优先于名录，名录内先到者（xlsx 首个规范名）优先。
+  const qa = pathogenQuarantineRank(a.quarantineList);
+  const qb = pathogenQuarantineRank(b.quarantineList);
+  const sa = pathogenSeverityRank(a.severity);
+  const sb = pathogenSeverityRank(b.severity);
+  let primary;
+  if (qb !== qa) primary = qb > qa ? b : a;
+  else if (sb !== sa) primary = sb > sa ? b : a;
+  else primary = b.custom && !a.custom ? b : a;
+  const secondary = primary === a ? b : a;
+  const merged = { ...primary };
+  Object.keys(secondary).forEach((key) => {
+    if (key === "custom") return;
+    const value = merged[key];
+    if (value === "" || value === undefined || value === null) merged[key] = secondary[key];
+  });
+  if (secondary.note && primary.note && secondary.note !== primary.note && !primary.note.includes(secondary.note)) {
+    merged.note = `${primary.note} / ${secondary.note}`;
+  }
+  return merged;
+}
+
+function applyPathogenRecord(item, fromCustom) {
   if (!item?.taxid) return;
-  const matchRank = item.matchRank || "exact";
-  PATHOGEN_DB.set(String(item.taxid), {
+  const taxid = String(item.taxid);
+  const record = {
     type: item.type || "待分类",
     severity: item.severity || "medium",
     zh: item.zh || item.ncbiName || item.englishName || "",
@@ -57,7 +90,7 @@ function applyPathogenRecord(item) {
     ncbiName: item.ncbiName || "",
     ncbiRank: item.ncbiRank || "",
     hazardClass: item.hazardClass || "",
-    matchRank,
+    matchRank: item.matchRank || "exact",
     biosafetyLevel: item.biosafetyLevel || "",
     syndrome: item.syndrome || "",
     disease: item.disease || "",
@@ -66,7 +99,10 @@ function applyPathogenRecord(item) {
     taxonomy: item.taxonomy || {},
     quarantineList: item.quarantineList || "",
     quarantineDisease: item.quarantineDisease || "",
-  });
+    custom: !!fromCustom,
+  };
+  const existing = PATHOGEN_DB.get(taxid);
+  PATHOGEN_DB.set(taxid, existing ? mergePathogenRecords(existing, record) : record);
 }
 
 function readCustomPathogens() {
@@ -402,8 +438,15 @@ function annotatePathogen(row, sample) {
   const isMonitoring = db.quarantineList === "monitoring" || MONITORING_TAXIDS.has(row.taxid);
 
   const type = db.type || "待分类";
-  // Quarantine/monitoring pathogens are always treated as highest severity
-  const severity = (isQuarantine || isMonitoring) ? "high" : (db.severity || "medium");
+  const isCladeAncestorSpecies = matchSource === "clade-ancestor" && row.rank.startsWith("S");
+  const rawSeverity = (isQuarantine || isMonitoring) ? "high" : (db.severity || "medium");
+  // 物种经属/科祖先匹配时，属级危害程度不直接继承到种级：属内并非所有种都是病原
+  // （如 Brucella anthropi 实为环境菌 Ochrobactrum），severity 降一级，
+  // 避免环境/机会致病种蹭属级 high 而泛滥进入重点关注。
+  // 检疫/监测病原除外（名录强制要求最高层级）。
+  const severity = isCladeAncestorSpecies && !isQuarantine && !isMonitoring && rawSeverity !== "low"
+    ? (rawSeverity === "high" ? "medium" : "low")
+    : rawSeverity;
   const isCladeMatch = matchSource === "clade-ancestor" || db.matchRank === "clade";
 
   let score = 0;
@@ -438,6 +481,15 @@ function annotatePathogen(row, sample) {
 
   const status = classifyStatus(score, row, severity, true, excluded, isQuarantine, isMonitoring);
   if (status.key === "background" && !isQuarantine && !isMonitoring && !isCladeMatch) return null;
+
+  // 非检疫/监测的种级祖先匹配：判读等级上限为"需复核"。
+  // "重点关注"保留给 species 精准匹配、检疫/监测病原及属/科级直接命中——
+  // 属内非致病变种（如 Brucella anthropi）即使 reads 很高也不应进入重点关注，
+  // 但其线索仍以"需复核"展示，信息不丢失。
+  if (isCladeAncestorSpecies && !isQuarantine && !isMonitoring && status.key === "critical") {
+    status.key = "review";
+    status.label = I18N.t("status.review");
+  }
 
   // Build note for clade-ancestor matches
   let note = db.note || "";
@@ -560,7 +612,44 @@ function getVisibleHits(sample) {
   const hits = sample.pathogenHits
     .filter((hit) => hit.row.directReads >= state.minDirect)
     .filter((hit) => !state.hideBackground || hit.status.key !== "background");
-  return suppressAncestorHits(hits, sample).slice(0, Math.max(1, state.topN));
+  const deduped = suppressAncestorHits(hits, sample);
+  // 先在完整去重列表上检测近缘种并列，再按 Top N 截断：
+  // 组内至少一个成员进入 Top N 时提示即可见。
+  return annotateAmbiguousSiblings(deduped, sample).slice(0, Math.max(1, state.topN));
+}
+
+function annotateAmbiguousSiblings(hits, sample) {
+  // 同一父节点下多个物种命中且 reads 在种间显著分摊时，Kraken2 可能在近缘种间不确定分配。
+  // 判据：组内至少 2 个物种各有 >=5 direct reads，且最高 reads 物种占比 <60%
+  // （如 Enterobacter cloacae complex 7 个种分摊 reads）。追加提示（浅拷贝，不污染
+  // pathogenHits 原数据），提醒结合基因组覆盖度确认，不删除条目。
+  const groups = new Map();
+  hits.forEach((hit) => {
+    if (!hit.row.rank.startsWith("S")) return;
+    const pid = String(hit.row.parentId);
+    if (!groups.has(pid)) groups.set(pid, []);
+    groups.get(pid).push(hit);
+  });
+  const tips = new Map();
+  groups.forEach((group) => {
+    if (group.length < 2) return;
+    const substantial = group.filter((item) => item.row.directReads >= 5);
+    if (substantial.length < 2) return;
+    const total = substantial.reduce((sum, item) => sum + item.row.directReads, 0);
+    const top = Math.max(...substantial.map((item) => item.row.directReads));
+    if (!total || top / total >= 0.6) return; // 最高 reads 物种占比 >=60%：分配相对明确
+    const names = substantial.map((item) => item.row.name).join(I18N.lang === "zh" ? "、" : ", ");
+    const tip = I18N.lang === "zh"
+      ? `注意：reads 可能在${names}等近缘种间分配不确定，建议结合基因组覆盖度确认。`
+      : `Reads may be ambiguously assigned among closely related species (${names}); confirm with genome coverage.`;
+    substantial.forEach((item) => tips.set(item, tip));
+  });
+  if (!tips.size) return hits;
+  return hits.map((hit) => {
+    const tip = tips.get(hit);
+    if (!tip) return hit;
+    return Object.assign({}, hit, { note: hit.note ? `${hit.note} ${tip}` : tip });
+  });
 }
 
 function suppressAncestorHits(hits, sample) {
@@ -639,14 +728,16 @@ function criteriaHtml() {
     <div><strong>总体原则：</strong>本软件基于 Kraken2 .k2report 文件整理病原体筛查结果。软件不会把所有物种注释都作为病原体报告，而是先根据人间传染病名录病原体知识库筛选候选项，再结合 reads、分类层级、minimizer 信息和样本背景进行分级展示。</div>
     <div><strong>候选范围：</strong>进入重点病原体检出表的 taxon 需要满足以下条件之一：TaxID 命中人间传染病名录知识库（精准匹配 species/subspecies/isolate/biotype 级别）；或该 taxon 的祖先属/科命中名录中的 genus/family 级病原体（clade 分支匹配）；或用户自定义病原体库命中。</div>
     <div><strong>匹配层级：</strong>名录中 genus 级条目表示该属所有种均为病原体（如布鲁氏菌属、弯曲杆菌属），annospecies 下任何 species 均可触发；species 级条目仅精准匹配该 TaxID。匹配层级在数据库中以「matchRank: exact/clade」标识。</div>
+    <div><strong>属级 severity 继承规则：</strong>物种经属/科祖先匹配（clade-ancestor）时，属级危害程度不直接继承到种级——属内并非所有种都是病原（如 Brucella anthropi 实为环境菌 Ochrobactrum），此类命中的危害程度自动降一级（high→medium→low），且判读等级上限为「需复核」。检疫/监测传染病不受此限制，仍按名录要求进入重点关注。</div>
     <div><strong>降噪规则：</strong>人源序列、合成序列、未培养或环境来源条目、非特异性分类节点、与样本类型不匹配的常见共生菌或背景菌、direct reads 极低的低丰度命中，通常会被降低优先级或归为背景/暂不报告。</div>
     <div><strong>证据分：</strong>每个候选病原体会计算 0-100 的证据分。证据分用于结果排序和复核优先级判断，不代表阳性概率，也不等同于临床确诊置信度。</div>
     <div><strong>证据来源：</strong>证据分主要参考知识库命中、危害程度分类（第一/二/三/四类）、是否注释到明确 species、clade reads、direct reads、distinct minimizers、疑似背景/污染/非特异性命中，以及当前选择的样本类型。</div>
-    <div><strong>重点关注：</strong>表示该 taxon 为病原体知识库中的第一类或第二类高关注对象，或具有较强的 reads/minimizer 支持。此类结果建议优先结合覆盖度、阴性/空白对照、近缘物种分布和必要的复核实验进一步确认。</div>
-    <div><strong>需复核：</strong>表示该 taxon 具有明确病原体线索，但证据强度、危害程度、reads 数量、minimizer 分布或样本背景尚不足以直接列为重点关注。此类结果建议结合原始 reads、覆盖分布和对照样本判断。</div>
+    <div><strong>重点关注：</strong>保留给以下三类命中——species 级精准匹配且证据分较高、检疫/监测传染病（任何丰度）、属/科级直接命中且 reads 支持充分。此类结果建议优先结合覆盖度、阴性/空白对照、近缘物种分布和必要的复核实验进一步确认。</div>
+    <div><strong>需复核：</strong>表示该 taxon 具有明确病原体线索，但证据强度、危害程度、reads 数量、minimizer 分布或样本背景尚不足以直接列为重点关注；也包括物种经属/科祖先匹配、属内致病原未定的命中。此类结果建议结合原始 reads、覆盖分布和对照样本判断。</div>
     <div><strong>低丰度线索：</strong>表示该 taxon 命中数量较低，或可能属于条件致病、共生、背景或低水平污染来源。此类结果通常作为筛查提示，不建议单独作为阳性结论。</div>
     <div><strong>背景/暂不报告：</strong>表示该 taxon 证据不足，或更可能来源于人源、合成序列、环境/未培养条目、非特异性分类或背景污染。默认情况下此类结果可被隐藏。</div>
     <div><strong>父级去重：</strong>如果已经检出明确的 species 或 subspecies，软件会隐藏其上级 genus/family 命中，避免同一来源在报告中重复出现。</div>
+    <div><strong>近缘种分配提示：</strong>当同一父节点下多个物种各有不少于 5 条 direct reads、且最高 reads 物种占比低于 60% 时（如 Enterobacter cloacae complex 多个种分摊 reads），软件会在备注中提示 reads 可能在近缘种间分配不确定，建议结合基因组覆盖度确认，但不删除任何条目。</div>
     <div><strong>展示排序：</strong>寄生虫/原虫和寄生虫/蠕虫优先展示，病毒其次，细菌再次；同一类型内按证据分从高到低排序，证据分相同时按 direct reads 从高到低排序。</div>
   `;
 }

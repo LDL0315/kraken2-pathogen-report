@@ -1,11 +1,12 @@
 // Generated from 人间传染病名录_TaxID-kraken2.xlsx. Do not edit by hand.
-// Total entries: 502, clade-level (genus/family): 113, exact-level: 389
+// Total entries: 506, clade-level (genus/family): 116, exact-level: 390
 // Quarantine diseases (检疫传染病): 11 TaxIDs, Monitoring diseases (监测传染病): 30 TaxIDs
+// 2026-10-25 补充 4 个 NCBI 分类断层条目（腺病毒属/正粘病毒科/肺病毒属/人RSV），详见 CHANGELOG.md
 window.SHENZHEN_PATHOGEN_META = {
   "sourceFile": "人间传染病名录_TaxID-kraken2.xlsx",
-  "totalRows": 503,
-  "validTaxids": 502,
-  "cladeLevelTaxids": 113,
+  "totalRows": 507,
+  "validTaxids": 506,
+  "cladeLevelTaxids": 116,
   "quarantineTaxids": 11,
   "monitoringTaxids": 30,
   "generatedFrom": "人间传染病名录_TaxID-kraken2.xlsx"
@@ -18,14 +19,14 @@ window.PATHOGEN_CLADE_TAXIDS = new Set([
   "1016", "1033", "1301", "1647", "1654", "1763", "3110", "4830", "4838", "4842",
   "4852", "4855", "4859", "5036", "5149", "5159", "5305", "5333", "5455", "5475",
   "5498", "5502", "5506", "5533", "5538", "5550", "5552", "5579", "5581", "5583",
-  "5587", "5598", "5600", "5855", "10358", "10911", "10912", "11019", "11040", "11646",
+  "5587", "5598", "5600", "5820", "10358", "10911", "10912", "11019", "11040", "11646",
   "12059", "12103", "13474", "13705", "29521", "29907", "34392", "34487", "36629", "36910",
   "36922", "37463", "37940", "38946", "40354", "40374", "40411", "41687", "43987", "55170",
   "55193", "59585", "59732", "65412", "66225", "79213", "81097", "82105", "83822", "90268",
   "95341", "100815", "101102", "112177", "114230", "114277", "117563", "138954", "142786", "151340",
   "159075", "160029", "162387", "194960", "229219", "241727", "249588", "284134", "308472", "364772",
   "389487", "413496", "461281", "688353", "694013", "1001993", "1494215", "1503932", "1507401", "1838142",
-  "1980442", "2810619", "3044782"
+  "1980442", "2810619", "3044782", "10509", "11308", "1868215"
 ]);
 
 // 检疫传染病 TaxIDs (国境卫生检疫法 2025): any hit forces highest priority
@@ -37,7 +38,7 @@ window.QUARANTINE_TAXIDS = new Set([
 // 监测传染病 TaxIDs (国境卫生检疫法 2025): any hit forces highest priority
 window.MONITORING_TAXIDS = new Set([
   "487", "520", "562", "621", "622", "623", "624", "670", "1717", "1773",
-  "5759", "5855", "10244", "11072", "11082", "11234", "11309", "11588", "12637", "12721",
+  "5759", "5820", "10244", "11072", "11082", "11234", "11309", "11588", "12637", "12721",
   "28901", "37124", "54736", "64320", "118655", "142786", "1980442", "2697049", "3052225", "3052518"
 ]);
 
@@ -6131,7 +6132,7 @@ window.SHENZHEN_PATHOGENS = [
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
   },
   {
-    "taxid": "5855",
+    "taxid": "5820",
     "zh": "疟原虫属",
     "englishName": "Plasmodium spp.",
     "ncbiName": "Plasmodium",
@@ -6157,5 +6158,55 @@ window.SHENZHEN_PATHOGENS = [
     "note": "危害程度：第三类；匹配层级：species级精准匹配",
     "quarantineList": "monitoring",
     "quarantineDisease": "细菌性和阿米巴性痢疾",
+  },
+  {
+    "taxid": "10509",
+    "zh": "腺病毒属",
+    "englishName": "Mastadenovirus",
+    "ncbiName": "Mastadenovirus",
+    "ncbiRank": "genus",
+    "type": "病毒",
+    "severity": "medium",
+    "hazardClass": "第三类",
+    "matchRank": "clade",
+    "note": "危害程度：第三类；匹配层级：属级以上全分支。NCBI分类断层补充：衔接名录条目「unidentified adenovirus」(10535)，覆盖人腺病毒A~G各型",
+  },
+  {
+    "taxid": "11308",
+    "zh": "正粘病毒科",
+    "englishName": "Orthomyxoviridae",
+    "ncbiName": "Orthomyxoviridae",
+    "ncbiRank": "family",
+    "type": "病毒",
+    "severity": "medium",
+    "hazardClass": "第三类",
+    "matchRank": "clade",
+    "note": "危害程度：第三类；匹配层级：属级以上全分支。NCBI分类断层补充：衔接名录条目「unidentified influenza virus」(11309)的监测意图，覆盖甲/乙/丙/丁型流感病毒",
+    "quarantineList": "monitoring",
+    "quarantineDisease": "流行性感冒",
+  },
+  {
+    "taxid": "1868215",
+    "zh": "肺病毒属",
+    "englishName": "Orthopneumovirus",
+    "ncbiName": "Orthopneumovirus",
+    "ncbiRank": "genus",
+    "type": "病毒",
+    "severity": "medium",
+    "hazardClass": "第三类",
+    "matchRank": "clade",
+    "note": "危害程度：第三类；匹配层级：属级以上全分支。NCBI分类断层补充：覆盖人呼吸道合胞病毒RSV A/B各型",
+  },
+  {
+    "taxid": "11250",
+    "zh": "呼吸道合胞病毒",
+    "englishName": "Human respiratory syncytial virus",
+    "ncbiName": "Human respiratory syncytial virus",
+    "ncbiRank": "species",
+    "type": "病毒",
+    "severity": "medium",
+    "hazardClass": "第三类",
+    "matchRank": "exact",
+    "note": "危害程度：第三类；匹配层级：species级精准匹配。NCBI分类断层补充：衔接名录旧节点「Respiratory syncytial virus」(12814)",
   },
 ];
